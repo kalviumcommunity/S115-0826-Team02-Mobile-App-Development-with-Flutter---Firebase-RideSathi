@@ -69,6 +69,7 @@ void main() {
   testWidgets('navigates back to the login screen', (tester) async {
     await tester.pumpWidget(wrap(const SignupScreen()));
 
+    await tester.ensureVisible(find.text('Log In'));
     await tester.tap(find.text('Log In'));
     await tester.pumpAndSettle();
 
