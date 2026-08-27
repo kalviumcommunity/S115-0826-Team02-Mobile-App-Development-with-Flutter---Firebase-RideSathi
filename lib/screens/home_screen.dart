@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/info_card.dart';
@@ -39,6 +40,18 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: ThemeController.themeModeNotifier,
+            builder: (context, mode, _) {
+              return IconButton(
+                icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                ),
+                tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                onPressed: () => ThemeController.toggleTheme(),
+              );
+            },
+          ),
           if (FirebaseService.isInitialized)
             AuthService.currentUser != null
                 ? IconButton(
