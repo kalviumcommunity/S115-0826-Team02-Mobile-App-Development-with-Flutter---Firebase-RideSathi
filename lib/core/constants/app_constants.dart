@@ -26,4 +26,6 @@ class AppConstants {
   // Navigation Routes
   static const String routeSplash = '/';
   static const String routeHome = '/home';
+  static const String routeLogin = '/login';
+  static const String routeSignup = '/signup';
 }

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/services/auth_service.dart';
+import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
 
 /// Splash screen that animates on launch and navigates to HomeScreen.
@@ -40,9 +42,16 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppConstants.routeHome);
-      }
+      if (!mounted) return;
+      // Firebase must be initialized before AuthService.currentUser can be
+      // read safely — when credentials are still pending, fall back to the
+      // baseline PR 01 behavior of always landing on the dashboard.
+      final destination = FirebaseService.isInitialized
+          ? (AuthService.currentUser != null
+              ? AppConstants.routeHome
+              : AppConstants.routeLogin)
+          : AppConstants.routeHome;
+      Navigator.of(context).pushReplacementNamed(destination);
     });
   }
 

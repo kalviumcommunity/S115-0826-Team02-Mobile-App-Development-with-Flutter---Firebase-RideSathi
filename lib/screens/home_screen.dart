@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/info_card.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
@@ -38,6 +39,19 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          if (FirebaseService.isInitialized)
+            AuthService.currentUser != null
+                ? IconButton(
+                    icon: const Icon(Icons.logout_rounded),
+                    tooltip: 'Log Out',
+                    onPressed: () => _handleLogout(context),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.login_rounded),
+                    tooltip: 'Log In',
+                    onPressed: () => Navigator.of(context)
+                        .pushNamed(AppConstants.routeLogin),
+                  ),
           IconButton(
             icon: const Icon(Icons.info_outline_rounded),
             tooltip: 'Baseline Info',
@@ -207,6 +221,21 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    try {
+      await AuthService.signOut();
+    } on AuthException catch (_) {
+      // Session termination failed; leave the user on the dashboard rather
+      // than navigating away from a still-authenticated session.
+      return;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppConstants.routeLogin,
+      (route) => false,
     );
   }
 
