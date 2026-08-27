@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ridesathi/core/constants/app_constants.dart';
 
 /// Reusable inline banner for informational, warning, or error messages
 /// shown on RideSathi authentication screens.
@@ -17,17 +18,17 @@ class InfoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppConstants.spaceM),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppConstants.spaceS),
           Expanded(
             child: Text(
               message,
@@ -39,3 +40,4 @@ class InfoBanner extends StatelessWidget {
     );
   }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ridesathi/core/constants/app_constants.dart';
 
 /// Reusable status and feature card widget for RideSathi baseline interface.
 class InfoCard extends StatelessWidget {
@@ -25,9 +26,9 @@ class InfoCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppConstants.spaceL),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -35,7 +36,7 @@ class InfoCard extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: isDark ? 0.2 : 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppConstants.radiusM),
               ),
               child: Icon(
                 icon,
@@ -62,13 +63,13 @@ class InfoCard extends StatelessWidget {
                       if (badgeText != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
+                            horizontal: AppConstants.spaceS,
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: (badgeColor ?? theme.colorScheme.primary)
                                 .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppConstants.radiusS),
                           ),
                           child: Text(
                             badgeText!,
@@ -81,13 +82,11 @@ class InfoCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppConstants.spaceXS),
                   Text(
                     description,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -99,3 +98,4 @@ class InfoCard extends StatelessWidget {
     );
   }
 }
+

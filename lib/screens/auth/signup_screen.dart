@@ -69,7 +69,10 @@ class _SignupScreenState extends State<SignupScreen> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppConstants.spaceXL,
+            vertical: AppConstants.spaceXL,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
@@ -78,38 +81,38 @@ class _SignupScreenState extends State<SignupScreen> {
                 Center(
                   child: Container(
                     padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: AppConstants.primaryAmber,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.local_taxi_rounded,
-                      size: 48,
-                      color: Colors.black,
+                      size: 44,
+                      color: theme.colorScheme.onPrimary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppConstants.spaceL),
                 Text(
                   'Create Your Account',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppConstants.spaceXS),
                 Text(
                   'Join the ${AppConstants.appName} network',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: AppConstants.spaceXL),
                 if (!FirebaseService.isInitialized) ...[
-                  InfoBanner(
+                  const InfoBanner(
                     icon: Icons.info_outline_rounded,
                     color: Colors.orange,
                     message:
                         "Firebase isn't connected yet. Native configuration is pending — sign up will work once it's provisioned.",
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppConstants.spaceL),
                 ],
                 if (_errorMessage != null) ...[
                   InfoBanner(
@@ -117,7 +120,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     color: theme.colorScheme.error,
                     message: _errorMessage!,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppConstants.spaceL),
                 ],
                 AuthTextField(
                   controller: _emailController,
@@ -126,7 +129,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   keyboardType: TextInputType.emailAddress,
                   validator: Validators.email,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppConstants.spaceL),
                 AuthTextField(
                   controller: _passwordController,
                   label: 'Password',
@@ -134,7 +137,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   isPassword: true,
                   validator: Validators.password,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppConstants.spaceL),
                 AuthTextField(
                   controller: _confirmPasswordController,
                   label: 'Confirm Password',
@@ -146,17 +149,20 @@ class _SignupScreenState extends State<SignupScreen> {
                     value,
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: AppConstants.spaceXL),
                 CustomButton(
                   label: 'Sign Up',
                   isLoading: _isLoading,
                   onPressed: _isLoading ? null : _handleSignup,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppConstants.spaceL),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account?'),
+                    Text(
+                      'Already have an account?',
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     TextButton(
                       onPressed: _isLoading
                           ? null
@@ -174,3 +180,5 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
+
+
