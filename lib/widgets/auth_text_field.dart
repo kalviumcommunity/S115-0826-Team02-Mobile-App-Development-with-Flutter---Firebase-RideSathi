@@ -48,12 +48,8 @@ class _AuthTextFieldState extends State<AuthTextField> {
                 onPressed: () => setState(() => _obscure = !_obscure),
               )
             : null,
-        filled: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
       ),
     );
   }
 }
+

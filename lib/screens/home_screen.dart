@@ -62,14 +62,17 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppConstants.spaceXL,
+          vertical: AppConstants.spaceL,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Union Welcome Banner
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppConstants.spaceXL),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isDark
@@ -78,7 +81,7 @@ class HomeScreen extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppConstants.radiusPill),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.1),
@@ -108,12 +111,15 @@ class HomeScreen extends StatelessWidget {
                       color: Color(0xFFCBD5E1),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppConstants.spaceL),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppConstants.spaceM,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppConstants.secondaryTeal.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
                       border: Border.all(
                         color: AppConstants.secondaryTeal.withValues(alpha: 0.4),
                       ),
@@ -128,7 +134,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                         SizedBox(width: 6),
                         Text(
-                          'PR 01 Foundation Established',
+                          'PR 03 Theme Standardized',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -141,14 +147,14 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppConstants.spaceXL),
 
             // Foundation Status Section
             Text(
               'System Foundation Status',
               style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppConstants.spaceM),
 
             InfoCard(
               title: 'Flutter Architecture Baseline',
@@ -183,14 +189,14 @@ class HomeScreen extends StatelessWidget {
               badgeColor: Colors.blue,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: AppConstants.spaceXL),
 
             // Feature Roadmap Section
             Text(
               'Module Roadmap (Upcoming PRs)',
               style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppConstants.spaceM),
 
             InfoCard(
               title: 'Rider Module',
@@ -223,6 +229,7 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+
 
   Future<void> _handleLogout(BuildContext context) async {
     try {
