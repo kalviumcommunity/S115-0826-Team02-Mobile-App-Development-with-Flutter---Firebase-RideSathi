@@ -11,6 +11,14 @@ class FirebaseService {
   static bool get isInitialized => _isInitialized;
   static String? get initializationError => _initializationError;
 
+  /// Allows tests to override the initialization state without a real
+  /// Firebase project. **Do not use outside of test code.**
+  @visibleForTesting
+  static set isInitializedOverride(bool value) {
+    _isInitialized = value;
+    if (value) _initializationError = null;
+  }
+
   /// Safely attempts to initialize Firebase Core using the generated
   /// [DefaultFirebaseOptions] for the current platform.
   static Future<void> initialize() async {

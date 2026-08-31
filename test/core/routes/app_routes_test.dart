@@ -38,8 +38,10 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(buildTestApp(AppRoutes.splash));
       expect(find.byType(SplashScreen), findsOneWidget);
+      // Use pump instead of pumpAndSettle to avoid timeout from splash
+      // animation; we only need to verify the route generates SplashScreen.
       await tester.pump(const Duration(milliseconds: 2500));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
     });
 
     testWidgets('generates HomeScreen for routeHome',
