@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../routes/app_routes.dart';
 
 /// Application-wide design tokens, strings, and configuration constants for RideSathi.
 class AppConstants {
@@ -46,10 +47,14 @@ class AppConstants {
   static const String statusFirebasePending = 'Pending Credentials';
   static const String statusPRScope = 'PR 01 Foundation';
 
-  // Navigation Routes
-  static const String routeSplash = '/';
-  static const String routeHome = '/home';
-  static const String routeLogin = '/login';
-  static const String routeSignup = '/signup';
+  // Navigation Routes (Delegated to AppRoutes single source of truth)
+  static const String routeSplash = AppRoutes.splash;
+  static const String routeHome = AppRoutes.home;
+  static const String routeLogin = AppRoutes.login;
+  static const String routeSignup = AppRoutes.signup;
+  static const String routeRiderHome = AppRoutes.riderHome;
+  static const String routeDriverHome = AppRoutes.driverHome;
+  static const String routeDispatcherHome = AppRoutes.dispatcherHome;
 }
+
 

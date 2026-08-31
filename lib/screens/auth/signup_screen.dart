@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/utils/validators.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
@@ -53,7 +54,7 @@ class _SignupScreenState extends State<SignupScreen> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppConstants.routeHome);
+      AppNavigator.toHome(context);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = e.message);
@@ -166,8 +167,13 @@ class _SignupScreenState extends State<SignupScreen> {
                     TextButton(
                       onPressed: _isLoading
                           ? null
-                          : () => Navigator.of(context)
-                              .pushReplacementNamed(AppConstants.routeLogin),
+                          : () {
+                              if (AppNavigator.canPop(context)) {
+                                AppNavigator.pop(context);
+                              } else {
+                                AppNavigator.toLogin(context);
+                              }
+                            },
                       child: const Text('Log In'),
                     ),
                   ],
@@ -180,5 +186,6 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
+
 
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
@@ -18,6 +19,7 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -41,25 +43,27 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    Timer(const Duration(milliseconds: 2200), () {
+    _navigationTimer = Timer(const Duration(milliseconds: 2200), () {
       if (!mounted) return;
       // Firebase must be initialized before AuthService.currentUser can be
       // read safely — when credentials are still pending, fall back to the
       // baseline PR 01 behavior of always landing on the dashboard.
       final destination = FirebaseService.isInitialized
           ? (AuthService.currentUser != null
-              ? AppConstants.routeHome
-              : AppConstants.routeLogin)
-          : AppConstants.routeHome;
-      Navigator.of(context).pushReplacementNamed(destination);
+              ? AppRoutes.home
+              : AppRoutes.login)
+          : AppRoutes.home;
+      AppNavigator.pushReplacementNamed(context, destination);
     });
   }
 
   @override
   void dispose() {
+    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
