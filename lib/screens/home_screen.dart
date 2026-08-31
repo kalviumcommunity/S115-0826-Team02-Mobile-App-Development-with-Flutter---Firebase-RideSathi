@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
+import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
@@ -62,8 +63,8 @@ class HomeScreen extends StatelessWidget {
                 : IconButton(
                     icon: const Icon(Icons.login_rounded),
                     tooltip: 'Log In',
-                    onPressed: () => Navigator.of(context)
-                        .pushNamed(AppConstants.routeLogin),
+                    onPressed: () =>
+                        AppNavigator.pushNamed(context, AppRoutes.login),
                   ),
           IconButton(
             icon: const Icon(Icons.info_outline_rounded),
@@ -253,10 +254,7 @@ class HomeScreen extends StatelessWidget {
       return;
     }
     if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppConstants.routeLogin,
-      (route) => false,
-    );
+    AppNavigator.logout(context);
   }
 
   void _showBaselineInfoDialog(BuildContext context) {
@@ -285,7 +283,7 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () => AppNavigator.pop(ctx),
             child: const Text('Close'),
           ),
         ],
@@ -293,3 +291,4 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
