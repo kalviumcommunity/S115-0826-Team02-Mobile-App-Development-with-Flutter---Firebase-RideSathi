@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../routes/app_routes.dart';
 
 /// Application-wide design tokens, strings, and configuration constants for RideSathi.
 class AppConstants {
@@ -17,13 +18,43 @@ class AppConstants {
   static const Color backgroundDark = Color(0xFF0F172A);
   static const Color cardDark = Color(0xFF1E293B);
   static const Color cardLight = Colors.white;
+  static const Color surfaceVariantLight = Color(0xFFF1F5F9);
+  static const Color surfaceVariantDark = Color(0xFF334155);
+  static const Color onSurfaceVariantLight = Color(0xFF64748B);
+  static const Color onSurfaceVariantDark = Color(0xFF94A3B8);
+  static const Color outlineLight = Color(0xFFCBD5E1);
+  static const Color outlineDark = Color(0xFF475569);
+  static const Color errorColor = Color(0xFFDC2626);
+
+  // Spacing Design Tokens
+  static const double spaceXS = 4.0;
+  static const double spaceS = 8.0;
+  static const double spaceM = 12.0;
+  static const double spaceL = 16.0;
+  static const double spaceXL = 24.0;
+  static const double spaceXXL = 32.0;
+
+  // Border Radius Design Tokens
+  static const double radiusS = 8.0;
+  static const double radiusM = 12.0;
+  static const double radiusL = 14.0;
+  static const double radiusXL = 16.0;
+  static const double radiusPill = 20.0;
+  static const double radiusFull = 100.0;
 
   // Status Labels
   static const String statusBaselineReady = 'Baseline Ready';
   static const String statusFirebasePending = 'Pending Credentials';
   static const String statusPRScope = 'PR 01 Foundation';
 
-  // Navigation Routes
-  static const String routeSplash = '/';
-  static const String routeHome = '/home';
+  // Navigation Routes (Delegated to AppRoutes single source of truth)
+  static const String routeSplash = AppRoutes.splash;
+  static const String routeHome = AppRoutes.home;
+  static const String routeLogin = AppRoutes.login;
+  static const String routeSignup = AppRoutes.signup;
+  static const String routeRiderHome = AppRoutes.riderHome;
+  static const String routeDriverHome = AppRoutes.driverHome;
+  static const String routeDispatcherHome = AppRoutes.dispatcherHome;
 }
+
+

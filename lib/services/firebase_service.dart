@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import '../firebase_options.dart';
+
 /// Centralized service to handle Firebase initialization and status tracking.
 class FirebaseService {
   static bool _isInitialized = false;
@@ -9,18 +11,21 @@ class FirebaseService {
   static bool get isInitialized => _isInitialized;
   static String? get initializationError => _initializationError;
 
-  /// Safely attempts to initialize Firebase Core.
-  /// Catches exceptions gracefully when native credentials are not yet provisioned.
+  /// Allows tests to override the initialization state without a real
+  /// Firebase project. **Do not use outside of test code.**
+  @visibleForTesting
+  static set isInitializedOverride(bool value) {
+    _isInitialized = value;
+    if (value) _initializationError = null;
+  }
+
+  /// Safely attempts to initialize Firebase Core using the generated
+  /// [DefaultFirebaseOptions] for the current platform.
   static Future<void> initialize() async {
     try {
-      if (kIsWeb) {
-        // Web Firebase initialization requires FirebaseOptions
-        _isInitialized = false;
-        _initializationError = 'Firebase Web options pending configuration.';
-        return;
-      }
-
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       _isInitialized = true;
       _initializationError = null;
       if (kDebugMode) {

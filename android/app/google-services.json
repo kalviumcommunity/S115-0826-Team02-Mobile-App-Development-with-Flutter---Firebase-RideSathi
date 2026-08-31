@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "984078491668",
+    "project_id": "ridesathi-f7ca3",
+    "storage_bucket": "ridesathi-f7ca3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:984078491668:android:6d1475f13b03fdabc5c701",
+        "android_client_info": {
+          "package_name": "com.ridesathi.ridesathi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTfVw5cEqBhOtOsvq40OsDkSvMGDTtunc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

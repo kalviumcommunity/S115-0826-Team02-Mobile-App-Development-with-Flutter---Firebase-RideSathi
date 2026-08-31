@@ -8,7 +8,10 @@ class UnionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppConstants.spaceL,
+        vertical: AppConstants.spaceS,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -16,7 +19,7 @@ class UnionBadge extends StatelessWidget {
             AppConstants.primaryAmber.withValues(alpha: 0.8),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppConstants.radiusPill),
         boxShadow: [
           BoxShadow(
             color: AppConstants.primaryAmber.withValues(alpha: 0.25),
@@ -48,3 +51,4 @@ class UnionBadge extends StatelessWidget {
     );
   }
 }
+

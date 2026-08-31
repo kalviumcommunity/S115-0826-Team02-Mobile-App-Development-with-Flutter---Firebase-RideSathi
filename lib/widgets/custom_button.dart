@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:ridesathi/core/constants/app_constants.dart';
 
 /// Reusable primary and secondary action button widget for RideSathi.
 class CustomButton extends StatelessWidget {
@@ -23,13 +22,17 @@ class CustomButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final foregroundColor = isSecondary
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onPrimary;
+
     final buttonChild = isLoading
-        ? const SizedBox(
+        ? SizedBox(
             height: 20,
             width: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+              valueColor: AlwaysStoppedAnimation<Color>(foregroundColor),
             ),
           )
         : Row(
@@ -40,20 +43,20 @@ class CustomButton extends StatelessWidget {
                 Icon(
                   icon,
                   size: 20,
-                  color: isSecondary
-                      ? theme.colorScheme.onSurface
-                      : Colors.black,
+                  color: foregroundColor,
                 ),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: isSecondary
-                      ? theme.colorScheme.onSurface
-                      : Colors.black,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: foregroundColor,
+                  ),
                 ),
               ),
             ],
@@ -65,28 +68,13 @@ class CustomButton extends StatelessWidget {
       child: isSecondary
           ? OutlinedButton(
               onPressed: isLoading ? null : onPressed,
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                side: BorderSide(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                  width: 1.5,
-                ),
-              ),
               child: buttonChild,
             )
           : ElevatedButton(
               onPressed: isLoading ? null : onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryAmber,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
               child: buttonChild,
             ),
     );
   }
 }
+
