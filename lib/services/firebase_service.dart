@@ -19,10 +19,27 @@ class FirebaseService {
     if (value) _initializationError = null;
   }
 
+  /// Resets the initialization state for unit and widget testing.
+  @visibleForTesting
+  static void resetForTesting() {
+    _isInitialized = false;
+    _initializationError = null;
+  }
+
   /// Safely attempts to initialize Firebase Core using the generated
   /// [DefaultFirebaseOptions] for the current platform.
+  ///
+  /// Idempotent: returns immediately if Firebase is already initialized.
   static Future<void> initialize() async {
+    if (_isInitialized) return;
+
     try {
+      if (Firebase.apps.isNotEmpty) {
+        _isInitialized = true;
+        _initializationError = null;
+        return;
+      }
+
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
