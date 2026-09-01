@@ -1,15 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
+import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/theme/theme_controller.dart';
-import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/info_card.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
 
-/// Foundation Home Dashboard Screen for RideSathi PR 01.
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+/// Foundation Home Dashboard Screen for RideSathi.
+///
+/// Delegates sign-out operations to [AuthController] and provides
+/// user-friendly error feedback instead of silently swallowing failures.
+class HomeScreen extends StatefulWidget {
+  /// Optional [AuthController] for dependency injection in tests.
+  final AuthController? authController;
+
+  const HomeScreen({super.key, this.authController});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final AuthController _authController;
+
+  /// Whether a sign-out operation is currently in progress.
+  bool _isLoggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authController = widget.authController ?? AuthController.instance;
+  }
+
+  Future<void> _handleLogout() async {
+    if (_isLoggingOut) return;
+    setState(() => _isLoggingOut = true);
+
+    final success = await _authController.signOut();
+
+    if (!mounted) return;
+    setState(() => _isLoggingOut = false);
+
+    if (success) {
+      AppNavigator.logout(context);
+    } else {
+      // Show user-friendly error feedback instead of silently swallowing.
+      final errorMessage = _authController.errorMessage ??
+          'Unable to sign out. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _handleLogout,
+          ),
+        ),
+      );
+      // Clear the error from the controller so it doesn't persist.
+      _authController.clearError();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,11 +106,24 @@ class HomeScreen extends StatelessWidget {
             },
           ),
           if (FirebaseService.isInitialized)
-            AuthService.currentUser != null
+            _authController.isAuthenticated
                 ? IconButton(
-                    icon: const Icon(Icons.logout_rounded),
+                    icon: _isLoggingOut
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.logout_rounded),
                     tooltip: 'Log Out',
-                    onPressed: () => _handleLogout(context),
+                    onPressed: _isLoggingOut
+                        ? null
+                        : _handleLogout,
                   )
                 : IconButton(
                     icon: const Icon(Icons.login_rounded),
@@ -244,19 +309,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      await AuthService.signOut();
-    } on AuthException catch (_) {
-      // Session termination failed; leave the user on the dashboard rather
-      // than navigating away from a still-authenticated session.
-      return;
-    }
-    if (!context.mounted) return;
-    AppNavigator.logout(context);
-  }
-
   void _showBaselineInfoDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -291,4 +343,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
