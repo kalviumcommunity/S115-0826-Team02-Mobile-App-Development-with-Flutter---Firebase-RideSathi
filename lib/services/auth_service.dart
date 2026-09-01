@@ -49,11 +49,65 @@ class AuthException implements Exception {
 /// Clean wrapper around [FirebaseAuth] providing the RideSathi authentication
 /// foundation: email/password sign up, sign in, sign out, and session state.
 ///
-/// Callers must confirm `FirebaseService.isInitialized` before invoking any
-/// member here — Firebase Core must be initialized first, otherwise
-/// [FirebaseAuth.instance] itself throws.
+/// Supports both instance-based dependency injection for testability
+/// and static access for backward compatibility across existing features.
 class AuthService {
-  AuthService._();
+  final FirebaseAuth? _firebaseAuth;
+
+  /// Creates an [AuthService] instance. If [auth] is omitted,
+  /// [FirebaseAuth.instance] is used.
+  const AuthService([FirebaseAuth? auth]) : _firebaseAuth = auth;
+
+  FirebaseAuth get _instance => _firebaseAuth ?? FirebaseAuth.instance;
+
+  /// The currently authenticated Firebase user on this instance.
+  User? get currentAuthUser => _instance.currentUser;
+
+  /// Stream of user authentication state changes.
+  Stream<User?> get onAuthStateChanged => _instance.authStateChanges();
+
+  /// Signs in a user using email and password.
+  Future<User?> userSignIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _instance.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      return credential.user;
+    } catch (e) {
+      throw AuthException.from(e);
+    }
+  }
+
+  /// Registers a new user using email and password.
+  Future<User?> userSignUp({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _instance.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      return credential.user;
+    } catch (e) {
+      throw AuthException.from(e);
+    }
+  }
+
+  /// Signs out the current user session.
+  Future<void> userSignOut() async {
+    try {
+      await _instance.signOut();
+    } catch (e) {
+      throw AuthException.from(e);
+    }
+  }
+
+  // --- Static Members (Full Backward Compatibility) ---
 
   static FirebaseAuth get _auth => FirebaseAuth.instance;
 
@@ -64,38 +118,14 @@ class AuthService {
   static Future<User?> signUp({
     required String email,
     required String password,
-  }) async {
-    try {
-      final credential = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      return credential.user;
-    } catch (e) {
-      throw AuthException.from(e);
-    }
-  }
+  }) =>
+      const AuthService().userSignUp(email: email, password: password);
 
   static Future<User?> signIn({
     required String email,
     required String password,
-  }) async {
-    try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-      return credential.user;
-    } catch (e) {
-      throw AuthException.from(e);
-    }
-  }
+  }) =>
+      const AuthService().userSignIn(email: email, password: password);
 
-  static Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-    } catch (e) {
-      throw AuthException.from(e);
-    }
-  }
+  static Future<void> signOut() => const AuthService().userSignOut();
 }
