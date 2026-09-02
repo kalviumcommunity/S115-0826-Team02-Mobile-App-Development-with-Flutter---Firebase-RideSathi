@@ -15,6 +15,7 @@ class UserModel {
   final UserRole role;
   final bool isUnionVerified;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   const UserModel({
     required this.id,
@@ -24,6 +25,7 @@ class UserModel {
     required this.role,
     this.isUnionVerified = false,
     required this.createdAt,
+    this.updatedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -35,6 +37,7 @@ class UserModel {
       'role': role.name,
       'isUnionVerified': isUnionVerified,
       'createdAt': createdAt.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
   }
 
@@ -52,6 +55,9 @@ class UserModel {
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'] as String)
           : DateTime.now(),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.parse(map['updatedAt'] as String)
+          : null,
     );
   }
 }

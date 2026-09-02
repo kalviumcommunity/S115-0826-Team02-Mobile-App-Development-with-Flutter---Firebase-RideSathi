@@ -4,22 +4,96 @@ import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
+import 'package:ridesathi/services/firestore_exception.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 
 /// Fake implementation of [AuthService] for deterministic controller unit tests.
 class FakeAuthService extends AuthService {
   final bool shouldFail;
   final String failureMessage;
+  final UserModel? userToReturn;
 
   const FakeAuthService({
     this.shouldFail = false,
     this.failureMessage = 'Operation failed',
+    this.userToReturn,
   });
+
+  @override
+  Future<UserModel?> userSignUp({
+    required String email,
+    required String password,
+    String? name,
+    String? phone,
+  }) async {
+    if (shouldFail) {
+      throw AuthException(failureMessage);
+    }
+    return userToReturn ??
+        UserModel(
+          id: 'test-rider-id',
+          name: name ?? 'Rider Name',
+          phoneNumber: phone ?? '9876543210',
+          email: email,
+          role: UserRole.rider,
+          isUnionVerified: false,
+          createdAt: DateTime.now(),
+        );
+  }
+
+  @override
+  Future<UserModel?> userSignIn({
+    required String email,
+    required String password,
+  }) async {
+    if (shouldFail) {
+      throw AuthException(failureMessage);
+    }
+    return userToReturn ??
+        UserModel(
+          id: 'test-user-id',
+          name: 'Existing User',
+          phoneNumber: '9876543210',
+          email: email,
+          role: UserRole.rider,
+          isUnionVerified: false,
+          createdAt: DateTime.now(),
+        );
+  }
 
   @override
   Future<void> userSignOut() async {
     if (shouldFail) {
       throw AuthException(failureMessage);
     }
+  }
+}
+
+/// Fake implementation of [UserProfileService] for controller tests.
+class FakeTestUserProfileService extends UserProfileService {
+  final bool shouldFail;
+  final String failureMessage;
+  UserModel? savedProfile;
+
+  FakeTestUserProfileService({
+    this.shouldFail = false,
+    this.failureMessage = 'Firestore error',
+  });
+
+  @override
+  Future<void> createRiderProfile(UserModel user) async {
+    if (shouldFail) {
+      throw FirestoreException(failureMessage);
+    }
+    savedProfile = user;
+  }
+
+  @override
+  Future<UserModel?> getUserProfile(String uid) async {
+    if (shouldFail) {
+      throw FirestoreException(failureMessage);
+    }
+    return savedProfile;
   }
 }
 
@@ -112,6 +186,85 @@ void main() {
 
       expect(controller.state.isUnauthenticated, isTrue);
       expect(controller.isAuthenticated, isFalse);
+    });
+
+    test('signUp creates auth user and persists rider profile in Firestore', () async {
+      final fakeAuth = const FakeAuthService(shouldFail: false);
+      final fakeProfile = FakeTestUserProfileService(shouldFail: false);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signUp(
+        email: 'rider@example.com',
+        password: 'password123',
+        name: 'Kavita Roy',
+        phone: '+919876543210',
+      );
+
+      expect(success, isTrue);
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+      expect(controller.currentUser!.name, equals('Kavita Roy'));
+      expect(controller.currentUser!.phoneNumber, equals('+919876543210'));
+      expect(controller.currentUser!.role, equals(UserRole.rider));
+      expect(fakeProfile.savedProfile, isNotNull);
+      expect(fakeProfile.savedProfile!.name, equals('Kavita Roy'));
+      expect(fakeProfile.savedProfile!.phoneNumber, equals('+919876543210'));
+    });
+
+    test('signUp handles AuthException during registration', () async {
+      final fakeAuth = const FakeAuthService(
+        shouldFail: true,
+        failureMessage: 'An account already exists with this email.',
+      );
+      final fakeProfile = FakeTestUserProfileService();
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signUp(
+        email: 'existing@example.com',
+        password: 'password123',
+      );
+
+      expect(success, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('An account already exists with this email.'),
+      );
+      expect(fakeProfile.savedProfile, isNull);
+    });
+
+    test('signUp handles FirestoreException when profile creation fails', () async {
+      final fakeAuth = const FakeAuthService(shouldFail: false);
+      final fakeProfile = FakeTestUserProfileService(
+        shouldFail: true,
+        failureMessage: 'Service is temporarily unavailable. Please try again later.',
+      );
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signUp(
+        email: 'new@example.com',
+        password: 'password123',
+        name: 'Test Rider',
+      );
+
+      expect(success, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('Service is temporarily unavailable. Please try again later.'),
+      );
     });
 
     test('signOut sets unauthenticated state on success', () async {
