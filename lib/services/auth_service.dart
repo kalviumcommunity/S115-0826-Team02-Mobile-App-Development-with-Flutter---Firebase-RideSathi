@@ -37,6 +37,12 @@ class AuthException extends ServiceException {
         return 'Network error. Check your connection and try again.';
       case 'too-many-requests':
         return 'Too many attempts. Please wait a moment and try again.';
+      case 'channel-error':
+        return 'Please enter both email and password.';
+      case 'quota-exceeded':
+        return 'Service temporarily busy. Please try again in a few moments.';
+      case 'user-token-expired':
+        return 'Your session has expired. Please log in again.';
       default:
         return 'Authentication failed. Please try again.';
     }
