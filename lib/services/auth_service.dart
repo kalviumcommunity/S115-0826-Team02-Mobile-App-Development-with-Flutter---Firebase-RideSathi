@@ -1,16 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
+import 'service_exception.dart';
 
 /// User-friendly exception surfaced by [AuthService] in place of raw Firebase
 /// exceptions, which must never reach the UI directly.
-class AuthException implements Exception {
-  final String message;
-
-  const AuthException(this.message);
+class AuthException extends ServiceException {
+  const AuthException(super.message, {super.code});
 
   factory AuthException.from(Object error) {
     if (error is FirebaseAuthException) {
-      return AuthException(_messageForCode(error.code));
+      return AuthException(_messageForCode(error.code), code: error.code);
     }
     return const AuthException(
       'Something went wrong. Please check your connection and try again.',
@@ -42,9 +41,6 @@ class AuthException implements Exception {
         return 'Authentication failed. Please try again.';
     }
   }
-
-  @override
-  String toString() => message;
 }
 
 /// Clean wrapper around [FirebaseAuth] providing the RideSathi authentication
@@ -126,8 +122,6 @@ class AuthService {
   }
 
   // --- Static Members (Full Backward Compatibility) ---
-
-  static FirebaseAuth get _auth => FirebaseAuth.instance;
 
   static UserModel? get currentUser => const AuthService().currentAuthUser;
 
