@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
 
 /// User-friendly exception surfaced by [AuthService] in place of raw Firebase
 /// exceptions, which must never reach the UI directly.
@@ -60,14 +61,29 @@ class AuthService {
 
   FirebaseAuth get _instance => _firebaseAuth ?? FirebaseAuth.instance;
 
+  /// Converts a Firebase [User] to a RideSathi [UserModel].
+  UserModel? _userFromFirebase(User? user, {String? name, String? phone}) {
+    if (user == null) return null;
+    return UserModel(
+      id: user.uid,
+      name: name ?? user.displayName ?? user.email?.split('@').first ?? 'RideSathi User',
+      phoneNumber: phone ?? user.phoneNumber ?? '',
+      email: user.email,
+      role: UserRole.rider,
+      isUnionVerified: false,
+      createdAt: DateTime.now(),
+    );
+  }
+
   /// The currently authenticated Firebase user on this instance.
-  User? get currentAuthUser => _instance.currentUser;
+  UserModel? get currentAuthUser => _userFromFirebase(_instance.currentUser);
 
   /// Stream of user authentication state changes.
-  Stream<User?> get onAuthStateChanged => _instance.authStateChanges();
+  Stream<UserModel?> get onAuthStateChanged => 
+      _instance.authStateChanges().map((user) => _userFromFirebase(user));
 
   /// Signs in a user using email and password.
-  Future<User?> userSignIn({
+  Future<UserModel?> userSignIn({
     required String email,
     required String password,
   }) async {
@@ -76,23 +92,25 @@ class AuthService {
         email: email.trim(),
         password: password,
       );
-      return credential.user;
+      return _userFromFirebase(credential.user);
     } catch (e) {
       throw AuthException.from(e);
     }
   }
 
   /// Registers a new user using email and password.
-  Future<User?> userSignUp({
+  Future<UserModel?> userSignUp({
     required String email,
     required String password,
+    String? name,
+    String? phone,
   }) async {
     try {
       final credential = await _instance.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      return credential.user;
+      return _userFromFirebase(credential.user, name: name, phone: phone);
     } catch (e) {
       throw AuthException.from(e);
     }
@@ -111,17 +129,19 @@ class AuthService {
 
   static FirebaseAuth get _auth => FirebaseAuth.instance;
 
-  static User? get currentUser => _auth.currentUser;
+  static UserModel? get currentUser => const AuthService().currentAuthUser;
 
-  static Stream<User?> get authStateChanges => _auth.authStateChanges();
+  static Stream<UserModel?> get authStateChanges => const AuthService().onAuthStateChanged;
 
-  static Future<User?> signUp({
+  static Future<UserModel?> signUp({
     required String email,
     required String password,
+    String? name,
+    String? phone,
   }) =>
-      const AuthService().userSignUp(email: email, password: password);
+      const AuthService().userSignUp(email: email, password: password, name: name, phone: phone);
 
-  static Future<User?> signIn({
+  static Future<UserModel?> signIn({
     required String email,
     required String password,
   }) =>

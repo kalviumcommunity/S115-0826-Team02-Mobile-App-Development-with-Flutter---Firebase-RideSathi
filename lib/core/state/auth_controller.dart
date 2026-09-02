@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -12,7 +11,7 @@ import 'auth_state.dart';
 /// and notifies UI listeners with immutable [AuthState] snapshots.
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
-  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<UserModel?>? _authSubscription;
 
   AuthState _state;
 
@@ -57,9 +56,9 @@ class AuthController extends ChangeNotifier {
   void _subscribeToAuthChanges() {
     try {
       _authSubscription?.cancel();
-      _authSubscription = _authService.onAuthStateChanged.listen((User? user) {
+      _authSubscription = _authService.onAuthStateChanged.listen((UserModel? user) {
         if (user != null) {
-          _setState(AuthState.authenticated(_userFromFirebase(user)));
+          _setState(AuthState.authenticated(user));
         } else {
           _setState(const AuthState.unauthenticated());
         }
@@ -79,7 +78,7 @@ class AuthController extends ChangeNotifier {
     try {
       final user = _authService.currentAuthUser;
       if (user != null) {
-        _setState(AuthState.authenticated(_userFromFirebase(user)));
+        _setState(AuthState.authenticated(user));
       } else {
         _setState(const AuthState.unauthenticated());
       }
@@ -100,7 +99,7 @@ class AuthController extends ChangeNotifier {
         password: password,
       );
       if (user != null) {
-        _setState(AuthState.authenticated(_userFromFirebase(user)));
+        _setState(AuthState.authenticated(user));
         return true;
       } else {
         _setState(const AuthState.error('Failed to authenticate user.'));
@@ -129,13 +128,11 @@ class AuthController extends ChangeNotifier {
       final user = await _authService.userSignUp(
         email: email,
         password: password,
+        name: name,
+        phone: phone,
       );
       if (user != null) {
-        _setState(AuthState.authenticated(_userFromFirebase(
-          user,
-          customName: name,
-          customPhone: phone,
-        )));
+        _setState(AuthState.authenticated(user));
         return true;
       } else {
         _setState(const AuthState.error('Failed to create account.'));
@@ -188,26 +185,6 @@ class AuthController extends ChangeNotifier {
   static void resetInstance() {
     _instance?.dispose();
     _instance = null;
-  }
-
-  /// Converts a Firebase [User] to a RideSathi [UserModel].
-  UserModel _userFromFirebase(
-    User user, {
-    String? customName,
-    String? customPhone,
-  }) {
-    return UserModel(
-      id: user.uid,
-      name: customName ??
-          user.displayName ??
-          user.email?.split('@').first ??
-          'RideSathi User',
-      phoneNumber: customPhone ?? user.phoneNumber ?? '',
-      email: user.email,
-      role: UserRole.rider,
-      isUnionVerified: false,
-      createdAt: DateTime.now(),
-    );
   }
 
   @override
