@@ -3,14 +3,17 @@ import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firebase_service.dart';
+import '../../services/firestore_exception.dart';
+import '../../services/user_profile_service.dart';
 import 'auth_state.dart';
 
 /// Observable controller managing application authentication session state.
 ///
-/// Coordinates actions through [AuthService], listens to session changes,
+/// Coordinates actions through [AuthService] and [UserProfileService], listens to session changes,
 /// and notifies UI listeners with immutable [AuthState] snapshots.
 class AuthController extends ChangeNotifier {
   final AuthService _authService;
+  final UserProfileService _userProfileService;
   StreamSubscription<UserModel?>? _authSubscription;
 
   AuthState _state;
@@ -21,9 +24,11 @@ class AuthController extends ChangeNotifier {
 
   AuthController({
     AuthService? authService,
+    UserProfileService? userProfileService,
     AuthState initialState = const AuthState.initial(),
     bool listenToAuthChanges = false,
   })  : _authService = authService ?? const AuthService(),
+        _userProfileService = userProfileService ?? const UserProfileService(),
         _state = initialState {
     if (listenToAuthChanges) {
       _subscribeToAuthChanges();
@@ -116,7 +121,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Registers a new user with email and password.
+  /// Registers a new user with email and password, then creates their rider profile document in Firestore.
   Future<bool> signUp({
     required String email,
     required String password,
@@ -132,6 +137,15 @@ class AuthController extends ChangeNotifier {
         phone: phone,
       );
       if (user != null) {
+        try {
+          await _userProfileService.createRiderProfile(user);
+        } catch (e) {
+          final errorMsg = e is FirestoreException
+              ? e.message
+              : 'Account created, but failed to save rider profile.';
+          _setState(AuthState.error(errorMsg));
+          return false;
+        }
         _setState(AuthState.authenticated(user));
         return true;
       } else {
@@ -139,6 +153,9 @@ class AuthController extends ChangeNotifier {
         return false;
       }
     } on AuthException catch (e) {
+      _setState(AuthState.error(e.message));
+      return false;
+    } on FirestoreException catch (e) {
       _setState(AuthState.error(e.message));
       return false;
     } catch (e) {

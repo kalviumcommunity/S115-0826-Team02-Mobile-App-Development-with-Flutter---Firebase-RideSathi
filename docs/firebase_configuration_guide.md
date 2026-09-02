@@ -104,3 +104,30 @@ flutter run               # Connected Android device / emulator
 > **Never Commit Server Secrets or Service Account Keys**:
 > - Client configuration files (`google-services.json`, `firebase_options.dart`) contain public platform identifiers and client API keys necessary for mobile app connectivity. These are designed by Google to be embedded in client binaries.
 > - **Private service account keys** (JSON files downloaded from Google Cloud IAM / Service Accounts), Admin SDK private keys, and environment passwords must **NEVER** be placed in the repository or committed to Git.
+
+---
+
+## 7. Rider Profile & Firestore Data Contract (PR 12)
+
+### Collection Structure: `users/{uid}`
+When a rider registers via `SignupScreen`, their account is created in Firebase Authentication, followed by their user profile document creation in Cloud Firestore under the `users` collection:
+
+```text
+users/
+  └── {uid}/
+        ├── id: string (Firebase Auth UID)
+        ├── name: string (Full Name, min 2 chars)
+        ├── email: string (Email address)
+        ├── phoneNumber: string (Mobile phone number)
+        ├── role: string ("rider")
+        ├── isUnionVerified: boolean (false by default)
+        ├── createdAt: timestamp (server timestamp)
+        └── updatedAt: timestamp (server timestamp)
+```
+
+### Security & Integrity Rules:
+1. **No Password Storage**: Passwords are managed strictly by Firebase Authentication and are never written to Firestore.
+2. **Deterministic Document ID**: Document ID in Firestore matches the Firebase Auth `uid` exactly.
+3. **Role Enforcement**: Newly registered users are assigned `UserRole.rider`. Arbitrary role injection is blocked by service constraints.
+4. **Partial-Failure Behavior**: If authentication succeeds but Firestore profile creation fails (e.g. network interruption or permission error), the application reports a clear error state. The auth account is preserved so profile creation can be retried on next session.
+

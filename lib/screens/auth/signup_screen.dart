@@ -24,6 +24,8 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -42,6 +44,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -69,6 +73,8 @@ class _SignupScreenState extends State<SignupScreen> {
     final success = await _authController.signUp(
       email: _emailController.text,
       password: _passwordController.text,
+      name: _nameController.text,
+      phone: _phoneController.text,
     );
 
     if (!mounted) return;
@@ -116,13 +122,13 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     Text(
-                      'Create Your Account',
+                      'Create Rider Account',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: AppConstants.spaceXS),
                     Text(
-                      'Join the ${AppConstants.appName} network',
+                      'Register as a rider on the ${AppConstants.appName} network',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge,
                     ),
@@ -144,6 +150,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       const SizedBox(height: AppConstants.spaceL),
                     ],
+                    AuthTextField(
+                      controller: _nameController,
+                      label: 'Full Name',
+                      icon: Icons.person_outline_rounded,
+                      keyboardType: TextInputType.name,
+                      validator: Validators.name,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
+                    AuthTextField(
+                      controller: _phoneController,
+                      label: 'Phone Number',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                      validator: Validators.phone,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
                     AuthTextField(
                       controller: _emailController,
                       label: 'Email',
