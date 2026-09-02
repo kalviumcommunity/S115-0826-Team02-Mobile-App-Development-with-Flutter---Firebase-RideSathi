@@ -11,6 +11,10 @@ class FirebaseService {
   static bool get isInitialized => _isInitialized;
   static String? get initializationError => _initializationError;
 
+  /// The primary [FirebaseApp] instance managed by Firebase Core.
+  /// Centralizes FirebaseApp access for future Firestore and Storage services.
+  static FirebaseApp get app => Firebase.app();
+
   /// Allows tests to override the initialization state without a real
   /// Firebase project. **Do not use outside of test code.**
   @visibleForTesting
