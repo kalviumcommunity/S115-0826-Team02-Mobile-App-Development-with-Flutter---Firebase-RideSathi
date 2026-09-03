@@ -3,7 +3,20 @@ enum UserRole {
   rider,
   driver,
   dispatcher,
-  admin,
+  admin;
+
+  /// Safely parses a [String] value into a [UserRole].
+  /// Returns `null` if the value does not match any recognized role.
+  static UserRole? tryParse(String? value) {
+    if (value == null) return null;
+    for (final role in UserRole.values) {
+      if (role.name == value) return role;
+    }
+    return null;
+  }
+
+  /// Whether the given [value] is a valid recognized role name.
+  static bool isValid(String? value) => tryParse(value) != null;
 }
 
 /// Baseline User data model for RideSathi.
@@ -45,15 +58,19 @@ class UserModel {
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    final roleString = map['role'] as String?;
+    final parsedRole = UserRole.tryParse(roleString);
+
+    if (parsedRole == null) {
+      throw FormatException('Invalid or unrecognized user role: "$roleString"');
+    }
+
     return UserModel(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       phoneNumber: map['phoneNumber'] as String? ?? '',
       email: map['email'] as String?,
-      role: UserRole.values.firstWhere(
-        (r) => r.name == map['role'],
-        orElse: () => UserRole.rider,
-      ),
+      role: parsedRole,
       isUnionVerified: map['isUnionVerified'] as bool? ?? false,
       vehicleInfo: map['vehicleInfo'] as String?,
       createdAt: map['createdAt'] != null

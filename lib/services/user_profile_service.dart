@@ -64,7 +64,7 @@ class UserProfileService {
   /// Retrieves a user profile from Firestore by UID.
   ///
   /// Returns `null` if the document does not exist.
-  /// Throws [FirestoreException] on read failure.
+  /// Throws [FirestoreException] on read failure or if the document contains an invalid/corrupted role.
   Future<UserModel?> getUserProfile(String uid) async {
     try {
       final doc = await _usersCollection.doc(uid).get();
@@ -83,6 +83,11 @@ class UserProfileService {
       }
 
       return UserModel.fromMap(data);
+    } on FormatException catch (_) {
+      throw const FirestoreException(
+        'User profile data is corrupted or contains an invalid role.',
+        code: 'invalid-profile',
+      );
     } catch (e) {
       if (e is FirestoreException) rethrow;
       throw FirestoreException.from(e);

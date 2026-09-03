@@ -3,13 +3,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
+import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/auth/login_screen.dart';
+import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 
-// These tests exercise client-side validation, the "Firebase not configured"
-// fallback path, and AuthController state integration. They never reach
-// AuthService.signIn because FirebaseService.isInitialized is false by default
-// in the test environment — so no real or emulated Firebase project is required.
+class _FakeAuthService extends AuthService {
+  final UserModel? userToReturn;
+  const _FakeAuthService({this.userToReturn});
+
+  @override
+  Future<UserModel?> userSignIn({
+    required String email,
+    required String password,
+  }) async {
+    return userToReturn ??
+        UserModel(
+          id: 'test-uid',
+          name: 'Test Rider',
+          phoneNumber: '9876543210',
+          email: email,
+          role: UserRole.rider,
+          createdAt: DateTime.now(),
+        );
+  }
+}
+
+class _FakeUserProfileService extends UserProfileService {
+  final UserModel? profileToReturn;
+  const _FakeUserProfileService({this.profileToReturn});
+
+  @override
+  Future<UserModel?> getUserProfile(String uid) async {
+    return profileToReturn;
+  }
+}
+
 void main() {
   late AuthController controller;
 
@@ -99,7 +129,115 @@ void main() {
       await tester.tap(find.text('Register as Driver'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Create Driver Account'), findsOneWidget); // Assuming driver signup screen says this
+      expect(find.text('Create Driver Account'), findsOneWidget);
+    });
+  });
+
+  group('LoginScreen — Successful Login', () {
+    testWidgets('submits valid credentials, resolves profile, and navigates to home',
+        (tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final rider = UserModel(
+        id: 'rider-abc',
+        name: 'Rider Ramesh',
+        phoneNumber: '9876543210',
+        email: 'rider@ridesathi.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final customController = AuthController(
+        authService: _FakeAuthService(userToReturn: rider),
+        userProfileService: _FakeUserProfileService(profileToReturn: rider),
+      );
+
+      await tester.pumpWidget(
+        wrap(LoginScreen(authController: customController)),
+      );
+
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'rider@ridesathi.com',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Log In'));
+      await tester.pumpAndSettle();
+
+      expect(customController.isAuthenticated, isTrue);
+      expect(customController.currentUser!.name, equals('Rider Ramesh'));
+      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+    });
+
+    testWidgets('submits driver credentials, resolves driver profile, and navigates to home',
+        (tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final driver = UserModel(
+        id: 'driver-xyz',
+        name: 'Driver Dharmendra',
+        phoneNumber: '9876543210',
+        email: 'driver@ridesathi.com',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto KA-01-1234',
+        createdAt: DateTime.now(),
+      );
+
+      final customController = AuthController(
+        authService: _FakeAuthService(userToReturn: driver),
+        userProfileService: _FakeUserProfileService(profileToReturn: driver),
+      );
+
+      await tester.pumpWidget(
+        wrap(LoginScreen(authController: customController)),
+      );
+
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'driver@ridesathi.com',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Log In'));
+      await tester.pumpAndSettle();
+
+      expect(customController.isAuthenticated, isTrue);
+      expect(customController.currentUser!.role, equals(UserRole.driver));
+      expect(customController.currentUser!.vehicleInfo, equals('Auto KA-01-1234'));
+      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+    });
+
+    testWidgets('shows error when profile is missing in Firestore',
+        (tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final orphan = UserModel(
+        id: 'orphan-123',
+        name: 'Orphan User',
+        phoneNumber: '9876543210',
+        email: 'orphan@ridesathi.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final customController = AuthController(
+        authService: _FakeAuthService(userToReturn: orphan),
+        userProfileService: const _FakeUserProfileService(profileToReturn: null),
+      );
+
+      await tester.pumpWidget(
+        wrap(LoginScreen(authController: customController)),
+      );
+
+      await tester.enterText(
+        find.byType(TextFormField).at(0),
+        'orphan@ridesathi.com',
+      );
+      await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+      await tester.tap(find.text('Log In'));
+      await tester.pumpAndSettle();
+
+      expect(customController.isAuthenticated, isFalse);
+      expect(
+        find.text('User profile not found. Please contact support or register again.'),
+        findsOneWidget,
+      );
     });
   });
 
