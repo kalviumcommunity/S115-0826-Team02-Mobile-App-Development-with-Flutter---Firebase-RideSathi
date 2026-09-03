@@ -2,29 +2,32 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
-import 'package:ridesathi/services/auth_service.dart';
+import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/widgets/error_view.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
 
 /// Represents the startup lifecycle phases of the splash screen.
 enum SplashState {
-  /// Initial state — animation playing, waiting for navigation timer.
+  /// Initial state — animation playing, waiting for session resolution and minimum timer.
   initializing,
 
-  /// Firebase failed to initialize — error state displayed.
+  /// Firebase or domain profile resolution failed — error state displayed.
   error,
 }
 
 /// Splash screen that animates on launch and navigates to the appropriate
-/// destination based on Firebase initialization and authentication state.
+/// destination based on Firebase initialization and domain authentication state.
 ///
 /// Navigation safety guarantees:
 /// - Only one navigation action is ever executed ([_hasNavigated] guard).
-/// - Timer is cancelled in [dispose] to prevent post-disposal callbacks.
+/// - Timer and AuthController listeners are cancelled in [dispose] to prevent post-disposal callbacks.
 /// - Navigation clears the entire back stack so splash cannot be returned to.
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  /// Optional [AuthController] for dependency injection in tests.
+  final AuthController? authController;
+
+  const SplashScreen({super.key, this.authController});
 
   @override
   State<SplashScreen> createState() => SplashScreenState();
@@ -36,10 +39,17 @@ class SplashScreenState extends State<SplashScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  late final AuthController _authController;
   Timer? _navigationTimer;
 
   /// Guards against duplicate navigation calls.
   bool _hasNavigated = false;
+
+  /// Whether the minimum branding timer (2200ms) has elapsed.
+  bool _timerFired = false;
+
+  /// Custom error message to display in [ErrorView] if profile resolution fails.
+  String? _errorMessage;
 
   /// Current startup lifecycle state.
   SplashState _splashState = SplashState.initializing;
@@ -47,6 +57,8 @@ class SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    _authController = widget.authController ?? AuthController.instance;
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -66,60 +78,103 @@ class SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
+    _authController.addListener(_onAuthStateChanged);
+
+    // If Firebase is initialized and auth status has not been checked, trigger check
+    if (FirebaseService.isInitialized) {
+      if (_authController.state.isInitial) {
+        _authController.checkAuthStatus();
+      }
+    }
+
     _navigationTimer = Timer(const Duration(milliseconds: 2200), () {
-      _navigateToDestination();
+      _timerFired = true;
+      _evaluateDestination();
     });
   }
 
-  /// Determines the correct destination and navigates, clearing the back stack.
+  void _onAuthStateChanged() {
+    if (!mounted) return;
+    _evaluateDestination();
+  }
+
+  /// Evaluates whether splash requirements are met and navigates or displays error.
   ///
-  /// Guarded by [_hasNavigated] to ensure this executes at most once.
-  void _navigateToDestination() {
+  /// Requires both minimum display duration ([_timerFired]) and a definitive auth state.
+  void _evaluateDestination() {
     if (_hasNavigated || !mounted) return;
 
-    // Firebase must be initialized before checking authentication state.
+    // Firebase must be initialized before proceeding with auth resolution
     if (!FirebaseService.isInitialized) {
-      setState(() {
-        _splashState = SplashState.error;
-      });
+      if (_timerFired) {
+        if (_splashState != SplashState.error) {
+          setState(() {
+            _splashState = SplashState.error;
+            _errorMessage = null;
+          });
+        }
+      }
+      return;
+    }
+
+    // If AuthController is in error state (e.g. missing profile, corrupted role, network failure)
+    if (_authController.state.isError) {
+      if (_timerFired) {
+        if (_splashState != SplashState.error) {
+          setState(() {
+            _splashState = SplashState.error;
+            _errorMessage = _authController.errorMessage;
+          });
+        }
+      }
+      return;
+    }
+
+    // Await definitive authentication state
+    if (_authController.state.isInitial || _authController.state.isAuthenticating) {
+      return;
+    }
+
+    // Must wait until minimum branding timer has elapsed to avoid visual flashing
+    if (!_timerFired) {
       return;
     }
 
     _hasNavigated = true;
 
-    // Wrap auth check in try-catch: if FirebaseAuth.instance is unavailable
-    // (e.g., platform issue or test environment), treat as unauthenticated.
-    bool isAuthenticated = false;
-    try {
-      isAuthenticated = AuthService.currentUser != null;
-    } catch (_) {
-      // Auth check failed — route to login as a safe fallback.
-    }
-
-    if (isAuthenticated) {
+    if (_authController.isAuthenticated) {
       AppNavigator.toHome(context);
     } else {
       AppNavigator.toLogin(context);
     }
   }
 
-  /// Retries the startup flow after a Firebase initialization error.
+  /// Retries the startup flow after a Firebase initialization or session error.
   void _retryStartup() {
     if (!mounted) return;
     setState(() {
       _splashState = SplashState.initializing;
+      _errorMessage = null;
     });
 
-    // Re-attempt navigation after a short delay to allow UI to update.
+    if (!FirebaseService.isInitialized) {
+      FirebaseService.initialize();
+    }
+
+    _authController.retryRestoration();
+
+    // Re-attempt destination evaluation after a short retry delay
     _navigationTimer?.cancel();
     _navigationTimer = Timer(const Duration(milliseconds: 800), () {
-      _navigateToDestination();
+      _timerFired = true;
+      _evaluateDestination();
     });
   }
 
   @override
   void dispose() {
     _navigationTimer?.cancel();
+    _authController.removeListener(_onAuthStateChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -248,11 +303,11 @@ class SplashScreenState extends State<SplashScreen>
     );
   }
 
-  /// Builds the error state when Firebase initialization has failed.
+  /// Builds the error state when Firebase initialization or session restoration has failed.
   Widget _buildErrorState() {
     return ErrorView(
       title: 'Unable to Start',
-      message:
+      message: _errorMessage ??
           'RideSathi could not connect to its services. '
           'Please check your internet connection and try again.',
       icon: Icons.cloud_off_rounded,

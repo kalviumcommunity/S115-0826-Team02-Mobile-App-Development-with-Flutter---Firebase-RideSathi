@@ -17,6 +17,9 @@ class AuthController extends ChangeNotifier {
   StreamSubscription<UserModel?>? _authSubscription;
 
   AuthState _state;
+  bool _isDisposed = false;
+  Future<void>? _activeRestoration;
+  String? _restoringUid;
 
   /// Global singleton instance for app-wide sharing where appropriate.
   static AuthController? _instance;
@@ -51,6 +54,7 @@ class AuthController extends ChangeNotifier {
   String? get errorMessage => _state.errorMessage;
 
   void _setState(AuthState newState) {
+    if (_isDisposed) return;
     if (_state != newState) {
       _state = newState;
       notifyListeners();
@@ -62,19 +66,31 @@ class AuthController extends ChangeNotifier {
     try {
       _authSubscription?.cancel();
       _authSubscription = _authService.onAuthStateChanged.listen((UserModel? authUser) async {
-        if (authUser != null) {
-          try {
-            final profile = await _userProfileService.getUserProfile(authUser.id);
-            if (profile != null) {
-              _setState(AuthState.authenticated(profile));
-            } else {
-              _setState(AuthState.authenticated(authUser));
-            }
-          } catch (_) {
-            _setState(AuthState.authenticated(authUser));
-          }
-        } else {
+        if (_isDisposed) return;
+
+        if (authUser == null) {
+          _restoringUid = null;
           _setState(const AuthState.unauthenticated());
+          return;
+        }
+
+        // Avoid duplicate resolution if already authenticated with this exact user
+        if (_state.isAuthenticated && _state.user?.id == authUser.id) {
+          return;
+        }
+
+        // Avoid duplicate concurrent resolution if an interactive login or check is in progress
+        if (_restoringUid == authUser.id) {
+          return;
+        }
+
+        _restoringUid = authUser.id;
+        try {
+          await _restoreDomainProfile(authUser.id);
+        } finally {
+          if (_restoringUid == authUser.id) {
+            _restoringUid = null;
+          }
         }
       });
     } catch (_) {
@@ -82,38 +98,82 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Resolves the user's Firestore domain profile document and updates state accordingly.
+  Future<UserModel?> _restoreDomainProfile(String uid) async {
+    try {
+      final profile = await _userProfileService.getUserProfile(uid);
+      if (profile != null) {
+        _setState(AuthState.authenticated(profile));
+        return profile;
+      } else {
+        _setState(const AuthState.error(
+          'User session active, but profile could not be found.',
+        ));
+        return null;
+      }
+    } on FirestoreException catch (e) {
+      _setState(AuthState.error(e.message));
+      return null;
+    } catch (_) {
+      _setState(const AuthState.error(
+        'Failed to load user profile. Please try again.',
+      ));
+      return null;
+    }
+  }
+
   /// Synchronizes authentication state with current [AuthService] session and resolves domain profile.
+  ///
+  /// Deduplicated and idempotent: concurrent invocations return the same active [Future].
   Future<void> checkAuthStatus() async {
+    if (_activeRestoration != null) {
+      return _activeRestoration!;
+    }
+
+    final future = _performCheckAuthStatus();
+    _activeRestoration = future;
+    try {
+      await future;
+    } finally {
+      _activeRestoration = null;
+    }
+  }
+
+  Future<void> _performCheckAuthStatus() async {
     if (!FirebaseService.isInitialized) {
-      _setState(const AuthState.unauthenticated());
+      if (FirebaseService.initializationError != null) {
+        _setState(const AuthState.error(
+          'RideSathi could not connect to its services. Please check your internet connection and try again.',
+        ));
+      } else {
+        _setState(const AuthState.unauthenticated());
+      }
       return;
     }
+
+    _setState(AuthState.authenticating(previousUser: _state.user));
 
     try {
       final authUser = _authService.currentAuthUser;
       if (authUser != null) {
+        _restoringUid = authUser.id;
         try {
-          final profile = await _userProfileService.getUserProfile(authUser.id);
-          if (profile != null) {
-            _setState(AuthState.authenticated(profile));
-          } else {
-            _setState(const AuthState.error(
-              'User session active, but profile could not be found.',
-            ));
-          }
-        } on FirestoreException catch (e) {
-          _setState(AuthState.error(e.message));
-        } catch (_) {
-          _setState(const AuthState.error(
-            'Failed to load user profile. Please try again.',
-          ));
+          await _restoreDomainProfile(authUser.id);
+        } finally {
+          _restoringUid = null;
         }
       } else {
         _setState(const AuthState.unauthenticated());
       }
-    } catch (e) {
+    } catch (_) {
       _setState(const AuthState.unauthenticated());
     }
+  }
+
+  /// Retries session restoration after an error.
+  Future<void> retryRestoration() async {
+    clearError();
+    await checkAuthStatus();
   }
 
   /// Signs in a user with email and password and resolves their Firestore domain profile.
@@ -132,6 +192,7 @@ class AuthController extends ChangeNotifier {
         return false;
       }
 
+      _restoringUid = authUser.id;
       try {
         final profile = await _userProfileService.getUserProfile(authUser.id);
         if (profile == null) {
@@ -150,6 +211,8 @@ class AuthController extends ChangeNotifier {
           'Failed to load user profile. Please try again.',
         ));
         return false;
+      } finally {
+        _restoringUid = null;
       }
     } on AuthException catch (e) {
       _setState(AuthState.error(e.message));
@@ -261,6 +324,8 @@ class AuthController extends ChangeNotifier {
   /// Signs out the currently authenticated user.
   Future<bool> signOut() async {
     try {
+      _restoringUid = null;
+      _activeRestoration = null;
       await _authService.userSignOut();
       _setState(const AuthState.unauthenticated());
       return true;
@@ -298,7 +363,11 @@ class AuthController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _authSubscription?.cancel();
+    _authSubscription = null;
+    _activeRestoration = null;
+    _restoringUid = null;
     super.dispose();
   }
 }

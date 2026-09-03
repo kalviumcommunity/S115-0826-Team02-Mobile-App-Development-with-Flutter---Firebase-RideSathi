@@ -165,3 +165,59 @@ AppNavigator.toHome(context) [Navigates to Home; PR 16 will introduce role-based
 ### Known Limitations & Roadmap Boundaries:
 - **Role-Based Routing (PR 16)**: Home dashboard redirection based on `UserModel.role` is scheduled for PR 16. Current login flows land on `/home`.
 - **Firestore Security Rules (PR 55/56)**: Cloud security rules enforcement is scheduled for the backend hardening milestone. Client role properties are verified at the domain boundary.
+
+---
+
+## 9. Authentication Persistence & Session Restoration Lifecycle (PR 15)
+
+### Core Persistence Principle
+RideSathi relies exclusively on Firebase Authentication's native platform persistence (Keychain on iOS, Keystore/EncryptedSharedPreferences on Android, and IndexedDB on Web) to manage auth credentials and tokens.
+**No local credential caching, custom SQLite database, or raw auth token storage in `SharedPreferences` or `UserModel` is permitted.**
+
+### Domain Session Restoration Lifecycle
+A valid Firebase Auth UID alone is insufficient to grant access to the application. A user session is considered authenticated only when the domain profile in Firestore `users/{uid}` is successfully resolved and validated:
+
+```text
+Application Launch / Hot Restart
+       ↓
+SplashScreen initializes & starts branding timer (2200ms)
+       ↓
+AuthController.checkAuthStatus()
+       ↓
+Firebase Auth checks native persistent session (AuthService.currentAuthUser)
+       ├── No authenticated user → AuthState.unauthenticated()
+       │                                ↓
+       │                         SplashScreen awaits branding timer → AppNavigator.toLogin(context)
+       └── Authenticated UID found
+            ↓
+       AuthState.authenticating()
+            ↓
+       Resolve domain profile: UserProfileService.getUserProfile(uid)
+            ├── Profile found & valid → AuthState.authenticated(userModel)
+            │                                ↓
+            │                         SplashScreen awaits branding timer → AppNavigator.toHome(context)
+            ├── Profile missing (null document) → AuthState.error('User session active, but profile could not be found.')
+            │                                ↓
+            │                         SplashScreen shows ErrorView with Retry button
+            ├── Corrupt profile / Invalid role → AuthState.error('User profile data is corrupted or contains an invalid role.')
+            │                                ↓
+            │                         SplashScreen shows ErrorView with Retry button
+            └── Network / Firestore failure → AuthState.error(networkError)
+                                             ↓
+                                      SplashScreen shows ErrorView with Retry button
+```
+
+### Deterministic Concurrency & Deduplication
+- **In-Flight Deduplication**: Concurrent calls to `AuthController.checkAuthStatus()` share an in-flight `Future<void>`, preventing redundant Firestore profile fetches and avoiding race conditions during application boot.
+- **Stream vs Boot Deduplication**: When `onAuthStateChanged` fires an event for a UID currently undergoing restoration or already authenticated with an identical user, redundant profile queries are bypassed.
+- **Disposal Safety**: `AuthController` tracks its disposed state (`_isDisposed`). Any asynchronous restoration or stream event finishing after controller disposal is prevented from calling `notifyListeners()`.
+
+### Error Boundaries & Failure Recovery
+1. **Missing Profile Document**: If Firebase Auth holds a session but Firestore document `users/{uid}` does not exist, the session is never marked authenticated. Instead, an `AuthState.error` is raised. The user sees a retry action or can navigate back to sign up.
+2. **Invalid / Corrupted Profile**: If the Firestore record contains unsupported role strings or malformed data, `UserModel.fromMap` fails fast with a `FormatException`, surfaced as a `FirestoreException` and mapped to `AuthState.error`. Privileged access is strictly denied.
+3. **Network Failure on Startup**: If connectivity is lost during startup restoration, the error state is displayed with a "Retry" button. Tapping retry invokes `AuthController.retryRestoration()`, attempting resolution again without discarding the persisted Firebase credentials.
+4. **Sign-Out Clears Domain State**: `AuthController.signOut()` signs out from Firebase Auth and resets in-memory `AuthState` to `AuthState.unauthenticated()`, purging user profile, vehicle information, and role cache. Subsequent logins always perform a clean fetch from Firestore.
+
+### Architectural Boundaries & Deferred Scope
+- **Generic Navigation Preserved**: Until PR 16 implements role-based routing (`/rider/home` vs `/driver/home`), authenticated sessions restore and navigate to `/home`, and unauthenticated sessions navigate to `/login`.
+- **No Direct Firebase Calls in UI**: `SplashScreen` and screens interact solely with `AuthController` and service contracts, ensuring full testability with mock test doubles.
