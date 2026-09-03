@@ -4,7 +4,7 @@ import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/screens/auth/signup_screen.dart';
+import 'package:ridesathi/screens/auth/driver_signup_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
@@ -22,7 +22,7 @@ class _FakeAuthService extends AuthService {
     String? vehicleInfo,
   }) async {
     return UserModel(
-      id: 'rider-mock-uid',
+      id: 'driver-mock-uid',
       name: name ?? '',
       phoneNumber: phone ?? '',
       email: email,
@@ -38,7 +38,7 @@ class _FakeUserProfileService extends UserProfileService {
   UserModel? savedProfile;
 
   @override
-  Future<void> createRiderProfile(UserModel user) async {
+  Future<void> createDriverProfile(UserModel user) async {
     savedProfile = user;
   }
 }
@@ -64,38 +64,39 @@ void main() {
     FirebaseService.isInitializedOverride = false;
   });
 
-  group('SignupScreen — Rider Branding & Layout', () {
-    testWidgets('renders rider-specific headings and taxi icon', (tester) async {
+  group('DriverSignupScreen — Driver Branding & Layout', () {
+    testWidgets('renders driver-specific headings and taxi icon', (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
-      expect(find.text('Create Rider Account'), findsOneWidget);
+      expect(find.text('Create Driver Account'), findsOneWidget);
       expect(
-        find.text('Register as a rider on the RideSathi network'),
+        find.text('Register as a driver on the RideSathi network'),
         findsOneWidget,
       );
       expect(find.byIcon(Icons.local_taxi_rounded), findsOneWidget);
     });
 
-    testWidgets('renders all required rider input fields', (tester) async {
+    testWidgets('renders all required driver input fields including vehicle info', (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       expect(find.widgetWithText(TextFormField, 'Full Name'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Phone Number'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Email'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Vehicle Info (e.g., Auto DL-01-AB-1234)'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Password'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Confirm Password'), findsOneWidget);
     });
   });
 
-  group('SignupScreen — Form Validation', () {
+  group('DriverSignupScreen — Form Validation', () {
     testWidgets('shows validation errors when submitting empty fields',
         (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       await tester.ensureVisible(find.text('Sign Up'));
@@ -105,20 +106,22 @@ void main() {
       expect(find.text('Full name is required.'), findsOneWidget);
       expect(find.text('Phone number is required.'), findsOneWidget);
       expect(find.text('Email is required.'), findsOneWidget);
+      expect(find.text('Vehicle Info is required'), findsOneWidget);
       expect(find.text('Password is required.'), findsOneWidget);
       expect(find.text('Please confirm your password.'), findsOneWidget);
     });
 
     testWidgets('shows errors for invalid name and phone inputs', (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       await tester.enterText(find.byType(TextFormField).at(0), 'A');
       await tester.enterText(find.byType(TextFormField).at(1), '12345');
       await tester.enterText(find.byType(TextFormField).at(2), 'not-an-email');
-      await tester.enterText(find.byType(TextFormField).at(3), '123');
+      await tester.enterText(find.byType(TextFormField).at(3), '');
       await tester.enterText(find.byType(TextFormField).at(4), '123');
+      await tester.enterText(find.byType(TextFormField).at(5), '123');
 
       await tester.ensureVisible(find.text('Sign Up'));
       await tester.tap(find.text('Sign Up'));
@@ -132,14 +135,15 @@ void main() {
 
     testWidgets('shows an error when passwords do not match', (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
-      await tester.enterText(find.byType(TextFormField).at(0), 'Aarav Sharma');
+      await tester.enterText(find.byType(TextFormField).at(0), 'Rajesh Kumar');
       await tester.enterText(find.byType(TextFormField).at(1), '+919876543210');
-      await tester.enterText(find.byType(TextFormField).at(2), 'rider@ridesathi.com');
-      await tester.enterText(find.byType(TextFormField).at(3), 'password123');
-      await tester.enterText(find.byType(TextFormField).at(4), 'different456');
+      await tester.enterText(find.byType(TextFormField).at(2), 'driver@ridesathi.com');
+      await tester.enterText(find.byType(TextFormField).at(3), 'Auto DL-01-AB-1234');
+      await tester.enterText(find.byType(TextFormField).at(4), 'password123');
+      await tester.enterText(find.byType(TextFormField).at(5), 'different456');
 
       await tester.ensureVisible(find.text('Sign Up'));
       await tester.tap(find.text('Sign Up'));
@@ -152,14 +156,15 @@ void main() {
         'shows a friendly message instead of crashing when Firebase is not configured',
         (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
-      await tester.enterText(find.byType(TextFormField).at(0), 'Aarav Sharma');
+      await tester.enterText(find.byType(TextFormField).at(0), 'Rajesh Kumar');
       await tester.enterText(find.byType(TextFormField).at(1), '+919876543210');
-      await tester.enterText(find.byType(TextFormField).at(2), 'rider@ridesathi.com');
-      await tester.enterText(find.byType(TextFormField).at(3), 'password123');
+      await tester.enterText(find.byType(TextFormField).at(2), 'driver@ridesathi.com');
+      await tester.enterText(find.byType(TextFormField).at(3), 'Auto DL-01-AB-1234');
       await tester.enterText(find.byType(TextFormField).at(4), 'password123');
+      await tester.enterText(find.byType(TextFormField).at(5), 'password123');
 
       await tester.ensureVisible(find.text('Sign Up'));
       await tester.tap(find.text('Sign Up'));
@@ -174,8 +179,8 @@ void main() {
     });
   });
 
-  group('SignupScreen — Successful Rider Registration', () {
-    testWidgets('submits valid rider data and navigates to home on success',
+  group('DriverSignupScreen — Successful Driver Registration', () {
+    testWidgets('submits valid driver data and navigates to home on success',
         (tester) async {
       FirebaseService.isInitializedOverride = true;
       final fakeAuth = const _FakeAuthService();
@@ -186,32 +191,34 @@ void main() {
       );
 
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: customController)),
+        wrap(DriverSignupScreen(authController: customController)),
       );
 
-      await tester.enterText(find.byType(TextFormField).at(0), 'Deepak Verma');
+      await tester.enterText(find.byType(TextFormField).at(0), 'Vikram Singh');
       await tester.enterText(find.byType(TextFormField).at(1), '9876543210');
-      await tester.enterText(find.byType(TextFormField).at(2), 'deepak@ridesathi.com');
-      await tester.enterText(find.byType(TextFormField).at(3), 'password123');
+      await tester.enterText(find.byType(TextFormField).at(2), 'vikram@ridesathi.com');
+      await tester.enterText(find.byType(TextFormField).at(3), 'Auto DL-01-AB-1234');
       await tester.enterText(find.byType(TextFormField).at(4), 'password123');
+      await tester.enterText(find.byType(TextFormField).at(5), 'password123');
 
       await tester.ensureVisible(find.text('Sign Up'));
       await tester.tap(find.text('Sign Up'));
       await tester.pumpAndSettle();
 
       expect(fakeProfile.savedProfile, isNotNull);
-      expect(fakeProfile.savedProfile!.name, equals('Deepak Verma'));
+      expect(fakeProfile.savedProfile!.name, equals('Vikram Singh'));
       expect(fakeProfile.savedProfile!.phoneNumber, equals('9876543210'));
-      expect(fakeProfile.savedProfile!.role, equals(UserRole.rider));
+      expect(fakeProfile.savedProfile!.role, equals(UserRole.driver));
+      expect(fakeProfile.savedProfile!.vehicleInfo, equals('Auto DL-01-AB-1234'));
       // Navigates to home screen
       expect(find.text('Welcome to RideSathi'), findsOneWidget);
     });
   });
 
-  group('SignupScreen — Navigation', () {
+  group('DriverSignupScreen — Navigation', () {
     testWidgets('navigates back to the login screen', (tester) async {
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       await tester.ensureVisible(find.text('Log In'));
@@ -222,12 +229,12 @@ void main() {
     });
   });
 
-  group('SignupScreen — AuthController Integration', () {
+  group('DriverSignupScreen — AuthController Integration', () {
     testWidgets('shows loading state from AuthController', (tester) async {
       controller.updateState(const AuthState.authenticating());
 
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       // The button should show loading spinner.
@@ -240,7 +247,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       expect(
@@ -255,7 +262,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       expect(find.text('Previous signup error'), findsOneWidget);
@@ -274,7 +281,7 @@ void main() {
       controller.updateState(const AuthState.authenticating());
 
       await tester.pumpWidget(
-        wrap(SignupScreen(authController: controller)),
+        wrap(DriverSignupScreen(authController: controller)),
       );
 
       // Log In TextButton should be disabled during loading.
