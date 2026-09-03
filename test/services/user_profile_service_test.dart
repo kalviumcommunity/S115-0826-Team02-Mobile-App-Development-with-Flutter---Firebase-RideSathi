@@ -26,6 +26,21 @@ class FakeUserProfileService extends UserProfileService {
   }
 
   @override
+  Future<void> createDriverProfile(UserModel user) async {
+    if (shouldThrow) {
+      throw exceptionToThrow ??
+          const FirestoreException(
+            'Service is temporarily unavailable. Please try again later.',
+            code: 'unavailable',
+          );
+    }
+    final data = user.toMap();
+    data['createdAt'] = DateTime.now().toIso8601String();
+    data['updatedAt'] = DateTime.now().toIso8601String();
+    _storage[user.id] = data;
+  }
+
+  @override
   Future<UserModel?> getUserProfile(String uid) async {
     if (shouldThrow) {
       throw exceptionToThrow ??
@@ -91,6 +106,30 @@ void main() {
       expect(raw, isNotNull);
       expect(raw!['role'], equals('rider'));
       expect(raw['id'], equals('rider-abc'));
+    });
+
+    test('creates driver profile using UID as document identifier', () async {
+      final user = UserModel(
+        id: 'driver-uid-999',
+        name: 'Amit Driver',
+        phoneNumber: '+919999900000',
+        email: 'amit@ridesathi.com',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto KA-01',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      await profileService.createDriverProfile(user);
+
+      expect(profileService.hasProfile('driver-uid-999'), isTrue);
+
+      final retrieved = await profileService.getUserProfile('driver-uid-999');
+      expect(retrieved, isNotNull);
+      expect(retrieved!.id, equals('driver-uid-999'));
+      expect(retrieved.name, equals('Amit Driver'));
+      expect(retrieved.role, equals(UserRole.driver));
+      expect(retrieved.vehicleInfo, equals('Auto KA-01'));
     });
 
     test('verifies timestamps are populated on creation', () async {
