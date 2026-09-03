@@ -61,9 +61,18 @@ class AuthController extends ChangeNotifier {
   void _subscribeToAuthChanges() {
     try {
       _authSubscription?.cancel();
-      _authSubscription = _authService.onAuthStateChanged.listen((UserModel? user) {
-        if (user != null) {
-          _setState(AuthState.authenticated(user));
+      _authSubscription = _authService.onAuthStateChanged.listen((UserModel? authUser) async {
+        if (authUser != null) {
+          try {
+            final profile = await _userProfileService.getUserProfile(authUser.id);
+            if (profile != null) {
+              _setState(AuthState.authenticated(profile));
+            } else {
+              _setState(AuthState.authenticated(authUser));
+            }
+          } catch (_) {
+            _setState(AuthState.authenticated(authUser));
+          }
         } else {
           _setState(const AuthState.unauthenticated());
         }
@@ -73,7 +82,7 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Synchronizes authentication state with current [AuthService] session.
+  /// Synchronizes authentication state with current [AuthService] session and resolves domain profile.
   Future<void> checkAuthStatus() async {
     if (!FirebaseService.isInitialized) {
       _setState(const AuthState.unauthenticated());
@@ -81,9 +90,24 @@ class AuthController extends ChangeNotifier {
     }
 
     try {
-      final user = _authService.currentAuthUser;
-      if (user != null) {
-        _setState(AuthState.authenticated(user));
+      final authUser = _authService.currentAuthUser;
+      if (authUser != null) {
+        try {
+          final profile = await _userProfileService.getUserProfile(authUser.id);
+          if (profile != null) {
+            _setState(AuthState.authenticated(profile));
+          } else {
+            _setState(const AuthState.error(
+              'User session active, but profile could not be found.',
+            ));
+          }
+        } on FirestoreException catch (e) {
+          _setState(AuthState.error(e.message));
+        } catch (_) {
+          _setState(const AuthState.error(
+            'Failed to load user profile. Please try again.',
+          ));
+        }
       } else {
         _setState(const AuthState.unauthenticated());
       }
@@ -92,25 +116,45 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  /// Signs in a user with email and password.
+  /// Signs in a user with email and password and resolves their Firestore domain profile.
   Future<bool> signIn({
     required String email,
     required String password,
   }) async {
     _setState(AuthState.authenticating(previousUser: _state.user));
     try {
-      final user = await _authService.userSignIn(
+      final authUser = await _authService.userSignIn(
         email: email,
         password: password,
       );
-      if (user != null) {
-        _setState(AuthState.authenticated(user));
-        return true;
-      } else {
+      if (authUser == null) {
         _setState(const AuthState.error('Failed to authenticate user.'));
         return false;
       }
+
+      try {
+        final profile = await _userProfileService.getUserProfile(authUser.id);
+        if (profile == null) {
+          _setState(const AuthState.error(
+            'User profile not found. Please contact support or register again.',
+          ));
+          return false;
+        }
+        _setState(AuthState.authenticated(profile));
+        return true;
+      } on FirestoreException catch (e) {
+        _setState(AuthState.error(e.message));
+        return false;
+      } catch (e) {
+        _setState(const AuthState.error(
+          'Failed to load user profile. Please try again.',
+        ));
+        return false;
+      }
     } on AuthException catch (e) {
+      _setState(AuthState.error(e.message));
+      return false;
+    } on FirestoreException catch (e) {
       _setState(AuthState.error(e.message));
       return false;
     } catch (e) {

@@ -12,12 +12,17 @@ class FakeAuthService extends AuthService {
   final bool shouldFail;
   final String failureMessage;
   final UserModel? userToReturn;
+  final UserModel? mockCurrentAuthUser;
 
   const FakeAuthService({
     this.shouldFail = false,
     this.failureMessage = 'Operation failed',
     this.userToReturn,
+    this.mockCurrentAuthUser,
   });
+
+  @override
+  UserModel? get currentAuthUser => mockCurrentAuthUser;
 
   @override
   Future<UserModel?> userSignUp({
@@ -76,6 +81,7 @@ class FakeAuthService extends AuthService {
 class FakeTestUserProfileService extends UserProfileService {
   final bool shouldFail;
   final String failureMessage;
+  final Map<String, UserModel> _profiles = {};
   UserModel? savedProfile;
 
   FakeTestUserProfileService({
@@ -83,12 +89,18 @@ class FakeTestUserProfileService extends UserProfileService {
     this.failureMessage = 'Firestore error',
   });
 
+  void setProfile(String uid, UserModel profile) {
+    _profiles[uid] = profile;
+    savedProfile = profile;
+  }
+
   @override
   Future<void> createRiderProfile(UserModel user) async {
     if (shouldFail) {
       throw FirestoreException(failureMessage);
     }
     savedProfile = user;
+    _profiles[user.id] = user;
   }
 
   @override
@@ -97,6 +109,7 @@ class FakeTestUserProfileService extends UserProfileService {
       throw FirestoreException(failureMessage);
     }
     savedProfile = user;
+    _profiles[user.id] = user;
   }
 
   @override
@@ -104,7 +117,7 @@ class FakeTestUserProfileService extends UserProfileService {
     if (shouldFail) {
       throw FirestoreException(failureMessage);
     }
-    return savedProfile;
+    return _profiles[uid] ?? savedProfile;
   }
 }
 
@@ -197,6 +210,220 @@ void main() {
 
       expect(controller.state.isUnauthenticated, isTrue);
       expect(controller.isAuthenticated, isFalse);
+    });
+
+    test('checkAuthStatus resolves domain profile when session exists', () async {
+      FirebaseService.isInitializedOverride = true;
+      final persistedUser = UserModel(
+        id: 'persisted-uid',
+        name: 'Persistent Driver',
+        phoneNumber: '+919876543210',
+        email: 'driver@ridesathi.com',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto DL-01',
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(mockCurrentAuthUser: persistedUser);
+      final fakeProfile = FakeTestUserProfileService()..setProfile('persisted-uid', persistedUser);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      await controller.checkAuthStatus();
+
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+      expect(controller.currentUser!.name, equals('Persistent Driver'));
+      expect(controller.currentUser!.role, equals(UserRole.driver));
+      expect(controller.currentUser!.vehicleInfo, equals('Auto DL-01'));
+    });
+
+    test('checkAuthStatus reports error when authenticated user profile is missing in Firestore', () async {
+      FirebaseService.isInitializedOverride = true;
+      final authUser = UserModel(
+        id: 'orphan-uid',
+        name: 'Orphan User',
+        phoneNumber: '+919876543210',
+        email: 'orphan@ridesathi.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(mockCurrentAuthUser: authUser);
+      final fakeProfile = FakeTestUserProfileService(); // No profile stored
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      await controller.checkAuthStatus();
+
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('User session active, but profile could not be found.'),
+      );
+    });
+
+    test('signIn authenticates and resolves rider domain profile from Firestore', () async {
+      final riderProfile = UserModel(
+        id: 'rider-123',
+        name: 'Rider Ramesh',
+        phoneNumber: '+919123456789',
+        email: 'rider@example.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(userToReturn: riderProfile);
+      final fakeProfile = FakeTestUserProfileService()..setProfile('rider-123', riderProfile);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signIn(
+        email: 'rider@example.com',
+        password: 'password123',
+      );
+
+      expect(success, isTrue);
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+      expect(controller.currentUser!.name, equals('Rider Ramesh'));
+      expect(controller.currentUser!.role, equals(UserRole.rider));
+    });
+
+    test('signIn authenticates and resolves driver domain profile with vehicleInfo', () async {
+      final driverProfile = UserModel(
+        id: 'driver-456',
+        name: 'Driver Dharmendra',
+        phoneNumber: '+919876543210',
+        email: 'driver@example.com',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto DL-01-AB-1234',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(userToReturn: driverProfile);
+      final fakeProfile = FakeTestUserProfileService()..setProfile('driver-456', driverProfile);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signIn(
+        email: 'driver@example.com',
+        password: 'password123',
+      );
+
+      expect(success, isTrue);
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+      expect(controller.currentUser!.name, equals('Driver Dharmendra'));
+      expect(controller.currentUser!.role, equals(UserRole.driver));
+      expect(controller.currentUser!.vehicleInfo, equals('Auto DL-01-AB-1234'));
+      expect(controller.currentUser!.isUnionVerified, isFalse);
+    });
+
+    test('signIn fails with clear error when profile document is missing in Firestore', () async {
+      final authUser = UserModel(
+        id: 'missing-doc-uid',
+        name: 'No Profile User',
+        phoneNumber: '+919876543210',
+        email: 'noprofile@example.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(userToReturn: authUser);
+      final fakeProfile = FakeTestUserProfileService(); // Profile will return null
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signIn(
+        email: 'noprofile@example.com',
+        password: 'password123',
+      );
+
+      expect(success, isFalse);
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('User profile not found. Please contact support or register again.'),
+      );
+    });
+
+    test('signIn fails when profile has corrupted data / invalid role', () async {
+      final authUser = UserModel(
+        id: 'corrupt-uid',
+        name: 'Corrupt User',
+        phoneNumber: '+919876543210',
+        email: 'corrupt@example.com',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeAuthService(userToReturn: authUser);
+      final fakeProfile = FakeTestUserProfileService(
+        shouldFail: true,
+        failureMessage: 'User profile data is corrupted or contains an invalid role.',
+      );
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signIn(
+        email: 'corrupt@example.com',
+        password: 'password123',
+      );
+
+      expect(success, isFalse);
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('User profile data is corrupted or contains an invalid role.'),
+      );
+    });
+
+    test('signIn handles AuthException during sign in', () async {
+      final fakeAuth = const FakeAuthService(
+        shouldFail: true,
+        failureMessage: 'Incorrect email or password.',
+      );
+      final fakeProfile = FakeTestUserProfileService();
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signIn(
+        email: 'wrong@example.com',
+        password: 'wrongpassword',
+      );
+
+      expect(success, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(
+        controller.errorMessage,
+        equals('Incorrect email or password.'),
+      );
     });
 
     test('signUp creates auth user and persists rider profile in Firestore', () async {

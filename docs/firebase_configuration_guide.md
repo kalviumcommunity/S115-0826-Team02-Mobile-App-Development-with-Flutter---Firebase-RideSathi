@@ -107,10 +107,10 @@ flutter run               # Connected Android device / emulator
 
 ---
 
-## 7. Rider Profile & Firestore Data Contract (PR 12)
+## 7. User Profile & Firestore Data Contract (PR 12 & PR 13)
 
 ### Collection Structure: `users/{uid}`
-When a rider registers via `SignupScreen`, their account is created in Firebase Authentication, followed by their user profile document creation in Cloud Firestore under the `users` collection:
+When a rider or driver registers, their account is created in Firebase Authentication, followed by their user profile document creation in Cloud Firestore under the `users` collection:
 
 ```text
 users/
@@ -119,8 +119,9 @@ users/
         ├── name: string (Full Name, min 2 chars)
         ├── email: string (Email address)
         ├── phoneNumber: string (Mobile phone number)
-        ├── role: string ("rider")
+        ├── role: string ("rider" | "driver")
         ├── isUnionVerified: boolean (false by default)
+        ├── vehicleInfo: string? (For drivers, e.g. "Auto DL-01-AB-1234")
         ├── createdAt: timestamp (server timestamp)
         └── updatedAt: timestamp (server timestamp)
 ```
@@ -128,6 +129,39 @@ users/
 ### Security & Integrity Rules:
 1. **No Password Storage**: Passwords are managed strictly by Firebase Authentication and are never written to Firestore.
 2. **Deterministic Document ID**: Document ID in Firestore matches the Firebase Auth `uid` exactly.
-3. **Role Enforcement**: Newly registered users are assigned `UserRole.rider`. Arbitrary role injection is blocked by service constraints.
-4. **Partial-Failure Behavior**: If authentication succeeds but Firestore profile creation fails (e.g. network interruption or permission error), the application reports a clear error state. The auth account is preserved so profile creation can be retried on next session.
+3. **Role Enforcement**: Newly registered riders are assigned `UserRole.rider`; drivers are assigned `UserRole.driver`. Arbitrary role injection is blocked by service constraints.
+4. **Partial-Failure Behavior**: If authentication succeeds but Firestore profile creation fails, the application reports a clear error state. The auth account is preserved so profile creation can be retried on next session.
 
+---
+
+## 8. Production Login & Session Entry Architecture (PR 14)
+
+### Authentication & Profile Resolution Pipeline
+Login resolves both the Firebase Authentication identity and the Firestore domain record before establishing an authenticated session:
+
+```text
+LoginScreen
+    ↓
+AuthController.signIn(email, password)
+    ↓
+AuthService.userSignIn() → Firebase Authentication (credential verification)
+    ↓
+Authenticated UID
+    ↓
+UserProfileService.getUserProfile(uid) → Firestore `users/{uid}`
+    ↓
+Complete domain UserModel (role: rider | driver, vehicleInfo, phone, etc.)
+    ↓
+AuthState.authenticated(userModel)
+    ↓
+AppNavigator.toHome(context) [Navigates to Home; PR 16 will introduce role-based routing]
+```
+
+### Missing Profile & Invalid Role Strategy:
+- **Missing Profile (`users/{uid}` absent)**: If a user authenticates with Firebase Auth credentials but has no Firestore document, login fails with a clear, recoverable error (`User profile not found. Please contact support or register again.`) and does not falsely mark the session as authenticated.
+- **Invalid/Unsupported Role**: If a Firestore profile contains an unmapped/corrupted role string, `UserModel.fromMap` throws a `FormatException` which `UserProfileService` wraps into a `FirestoreException` (`User profile data is corrupted or contains an invalid role.`).
+- **Session Persistence**: On application restart, `AuthController.checkAuthStatus()` reads `currentAuthUser` from `AuthService` and re-resolves the latest `UserModel` profile from `UserProfileService`.
+
+### Known Limitations & Roadmap Boundaries:
+- **Role-Based Routing (PR 16)**: Home dashboard redirection based on `UserModel.role` is scheduled for PR 16. Current login flows land on `/home`.
+- **Firestore Security Rules (PR 55/56)**: Cloud security rules enforcement is scheduled for the backend hardening milestone. Client role properties are verified at the domain boundary.

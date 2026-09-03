@@ -51,7 +51,18 @@ class FakeUserProfileService extends UserProfileService {
     }
     final data = _storage[uid];
     if (data == null) return null;
-    return UserModel.fromMap(data);
+    try {
+      return UserModel.fromMap(data);
+    } on FormatException catch (_) {
+      throw const FirestoreException(
+        'User profile data is corrupted or contains an invalid role.',
+        code: 'invalid-profile',
+      );
+    }
+  }
+
+  void setRawData(String uid, Map<String, dynamic> data) {
+    _storage[uid] = data;
   }
 
   bool hasProfile(String uid) => _storage.containsKey(uid);
@@ -176,6 +187,24 @@ void main() {
     test('returns null when profile does not exist', () async {
       final result = await profileService.getUserProfile('non-existent-uid');
       expect(result, isNull);
+    });
+
+    test('throws FirestoreException when profile has an invalid role', () async {
+      profileService.setRawData('corrupt-uid', {
+        'id': 'corrupt-uid',
+        'name': 'Corrupt User',
+        'phoneNumber': '1234567890',
+        'role': 'super_admin_unauthorized',
+      });
+
+      expect(
+        () => profileService.getUserProfile('corrupt-uid'),
+        throwsA(isA<FirestoreException>().having(
+          (e) => e.code,
+          'code',
+          equals('invalid-profile'),
+        )),
+      );
     });
   });
 }
