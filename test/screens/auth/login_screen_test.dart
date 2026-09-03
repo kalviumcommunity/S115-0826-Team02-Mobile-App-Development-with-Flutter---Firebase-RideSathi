@@ -70,7 +70,7 @@ void main() {
   });
 
   group('LoginScreen — Navigation', () {
-    testWidgets('navigates to the signup screen', (tester) async {
+    testWidgets('navigates to the signup screen via bottom sheet', (tester) async {
       await tester.pumpWidget(
         wrap(LoginScreen(authController: controller)),
       );
@@ -78,7 +78,28 @@ void main() {
       await tester.tap(find.text('Sign Up'));
       await tester.pumpAndSettle();
 
+      expect(find.text('Choose Account Type'), findsOneWidget);
+
+      await tester.tap(find.text('Register as Rider'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Create Rider Account'), findsOneWidget);
+    });
+
+    testWidgets('navigates to the driver signup screen via bottom sheet', (tester) async {
+      await tester.pumpWidget(
+        wrap(LoginScreen(authController: controller)),
+      );
+
+      await tester.tap(find.text('Sign Up'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Choose Account Type'), findsOneWidget);
+
+      await tester.tap(find.text('Register as Driver'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Create Driver Account'), findsOneWidget); // Assuming driver signup screen says this
     });
   });
 

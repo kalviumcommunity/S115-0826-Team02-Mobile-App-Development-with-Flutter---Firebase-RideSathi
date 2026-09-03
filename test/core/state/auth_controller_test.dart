@@ -25,17 +25,20 @@ class FakeAuthService extends AuthService {
     required String password,
     String? name,
     String? phone,
+    UserRole role = UserRole.rider,
+    String? vehicleInfo,
   }) async {
     if (shouldFail) {
       throw AuthException(failureMessage);
     }
     return userToReturn ??
         UserModel(
-          id: 'test-rider-id',
-          name: name ?? 'Rider Name',
+          id: 'test-user-id',
+          name: name ?? 'New User',
           phoneNumber: phone ?? '9876543210',
           email: email,
-          role: UserRole.rider,
+          role: role,
+          vehicleInfo: vehicleInfo,
           isUnionVerified: false,
           createdAt: DateTime.now(),
         );
@@ -82,6 +85,14 @@ class FakeTestUserProfileService extends UserProfileService {
 
   @override
   Future<void> createRiderProfile(UserModel user) async {
+    if (shouldFail) {
+      throw FirestoreException(failureMessage);
+    }
+    savedProfile = user;
+  }
+
+  @override
+  Future<void> createDriverProfile(UserModel user) async {
     if (shouldFail) {
       throw FirestoreException(failureMessage);
     }
@@ -213,6 +224,33 @@ void main() {
       expect(fakeProfile.savedProfile, isNotNull);
       expect(fakeProfile.savedProfile!.name, equals('Kavita Roy'));
       expect(fakeProfile.savedProfile!.phoneNumber, equals('+919876543210'));
+    });
+
+    test('signUpDriver creates auth user and persists driver profile in Firestore', () async {
+      final fakeAuth = const FakeAuthService(shouldFail: false);
+      final fakeProfile = FakeTestUserProfileService(shouldFail: false);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      final success = await controller.signUpDriver(
+        email: 'driver@example.com',
+        password: 'password123',
+        name: 'Rahul Driver',
+        phone: '+919999988888',
+        vehicleInfo: 'Auto KA-01',
+      );
+
+      expect(success, isTrue);
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+      expect(controller.currentUser!.name, equals('Rahul Driver'));
+      expect(controller.currentUser!.role, equals(UserRole.driver));
+      expect(fakeProfile.savedProfile, isNotNull);
+      expect(fakeProfile.savedProfile!.role, equals(UserRole.driver));
+      expect(fakeProfile.savedProfile!.vehicleInfo, equals('Auto KA-01'));
     });
 
     test('signUp handles AuthException during registration', () async {

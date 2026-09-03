@@ -8,24 +8,28 @@ import 'package:ridesathi/widgets/auth_text_field.dart';
 import 'package:ridesathi/widgets/custom_button.dart';
 import 'package:ridesathi/widgets/info_banner.dart';
 
-/// Email/password login screen for RideSathi.
+/// Email/password driver registration screen for RideSathi.
 ///
 /// Delegates authentication operations to [AuthController] and derives
 /// loading/error state from [AuthState], eliminating local state duplication.
-class LoginScreen extends StatefulWidget {
+class DriverSignupScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
 
-  const LoginScreen({super.key, this.authController});
+  const DriverSignupScreen({super.key, this.authController});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<DriverSignupScreen> createState() => _DriverSignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _DriverSignupScreenState extends State<DriverSignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _vehicleInfoController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   late final AuthController _authController;
 
@@ -41,12 +45,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
+    _vehicleInfoController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSignup() async {
     // Prevent duplicate submissions while authenticating.
     if (_authController.isAuthenticating) return;
 
@@ -59,14 +67,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!FirebaseService.isInitialized) {
       setState(() {
         _localError =
-            'Firebase authentication is not available yet. Please complete Firebase setup before signing in.';
+            'Firebase authentication is not available yet. Please complete Firebase setup before signing up.';
       });
       return;
     }
 
-    final success = await _authController.signIn(
+    final success = await _authController.signUpDriver(
       email: _emailController.text,
       password: _passwordController.text,
+      name: _nameController.text,
+      phone: _phoneController.text,
+      vehicleInfo: _vehicleInfoController.text,
     );
 
     if (!mounted) return;
@@ -114,13 +125,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     Text(
-                      AppConstants.appName,
+                      'Create Driver Account',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: AppConstants.spaceXS),
                     Text(
-                      'Sign in to continue',
+                      'Register as a driver on the ${AppConstants.appName} network',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyLarge,
                     ),
@@ -130,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Icons.info_outline_rounded,
                         color: Colors.orange,
                         message:
-                            "Firebase isn't connected yet. Native configuration is pending — sign in will work once it's provisioned.",
+                            "Firebase isn't connected yet. Native configuration is pending — sign up will work once it's provisioned.",
                       ),
                       const SizedBox(height: AppConstants.spaceL),
                     ],
@@ -143,6 +154,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: AppConstants.spaceL),
                     ],
                     AuthTextField(
+                      controller: _nameController,
+                      label: 'Full Name',
+                      icon: Icons.person_outline_rounded,
+                      keyboardType: TextInputType.name,
+                      validator: Validators.name,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
+                    AuthTextField(
+                      controller: _phoneController,
+                      label: 'Phone Number',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                      validator: Validators.phone,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
+                    AuthTextField(
                       controller: _emailController,
                       label: 'Email',
                       icon: Icons.email_outlined,
@@ -151,32 +178,60 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     AuthTextField(
+                      controller: _vehicleInfoController,
+                      label: 'Vehicle Info (e.g., Auto DL-01-AB-1234)',
+                      icon: Icons.directions_car_outlined,
+                      keyboardType: TextInputType.text,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? 'Vehicle Info is required'
+                              : null,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
+                    AuthTextField(
                       controller: _passwordController,
                       label: 'Password',
                       icon: Icons.lock_outline_rounded,
                       isPassword: true,
-                      textInputAction: TextInputAction.done,
                       validator: Validators.password,
+                    ),
+                    const SizedBox(height: AppConstants.spaceL),
+                    AuthTextField(
+                      controller: _confirmPasswordController,
+                      label: 'Confirm Password',
+                      icon: Icons.lock_outline_rounded,
+                      isPassword: true,
+                      textInputAction: TextInputAction.done,
+                      validator: (value) => Validators.confirmPassword(
+                        _passwordController.text,
+                        value,
+                      ),
                     ),
                     const SizedBox(height: AppConstants.spaceXL),
                     CustomButton(
-                      label: 'Log In',
+                      label: 'Sign Up',
                       isLoading: isLoading,
-                      onPressed: isLoading ? null : _handleLogin,
+                      onPressed: isLoading ? null : _handleSignup,
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          "Don't have an account?",
+                          'Already have an account?',
                           style: theme.textTheme.bodyMedium,
                         ),
                         TextButton(
                           onPressed: isLoading
                               ? null
-                              : () => _showSignupOptions(context),
-                          child: const Text('Sign Up'),
+                              : () {
+                                  if (AppNavigator.canPop(context)) {
+                                    AppNavigator.pop(context);
+                                  } else {
+                                    AppNavigator.toLogin(context);
+                                  }
+                                },
+                          child: const Text('Log In'),
                         ),
                       ],
                     ),
@@ -187,49 +242,6 @@ class _LoginScreenState extends State<LoginScreen> {
           },
         ),
       ),
-    );
-  }
-
-  void _showSignupOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        final theme = Theme.of(context);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Choose Account Type',
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const Icon(Icons.person),
-                  title: const Text('Register as Rider'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    AppNavigator.toSignup(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.directions_car),
-                  title: const Text('Register as Driver'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    AppNavigator.toDriverSignup(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

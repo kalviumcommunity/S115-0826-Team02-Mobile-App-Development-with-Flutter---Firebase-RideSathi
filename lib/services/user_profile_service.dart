@@ -42,6 +42,25 @@ class UserProfileService {
     }
   }
 
+  /// Creates a driver profile document in Firestore at `users/{uid}`.
+  ///
+  /// Uses server timestamps for `createdAt` and `updatedAt` to ensure
+  /// consistent time tracking regardless of client clock.
+  ///
+  /// Throws [FirestoreException] if the write fails.
+  Future<void> createDriverProfile(UserModel user) async {
+    try {
+      final data = user.toMap();
+      // Replace client-side timestamps with Firestore server timestamps.
+      data['createdAt'] = FieldValue.serverTimestamp();
+      data['updatedAt'] = FieldValue.serverTimestamp();
+
+      await _usersCollection.doc(user.id).set(data);
+    } catch (e) {
+      throw FirestoreException.from(e);
+    }
+  }
+
   /// Retrieves a user profile from Firestore by UID.
   ///
   /// Returns `null` if the document does not exist.

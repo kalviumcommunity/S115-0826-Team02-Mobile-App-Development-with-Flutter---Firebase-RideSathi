@@ -14,6 +14,7 @@ class UserModel {
   final String? email;
   final UserRole role;
   final bool isUnionVerified;
+  final String? vehicleInfo;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -24,6 +25,7 @@ class UserModel {
     this.email,
     required this.role,
     this.isUnionVerified = false,
+    this.vehicleInfo,
     required this.createdAt,
     this.updatedAt,
   });
@@ -36,6 +38,7 @@ class UserModel {
       'email': email,
       'role': role.name,
       'isUnionVerified': isUnionVerified,
+      'vehicleInfo': vehicleInfo,
       'createdAt': createdAt.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
@@ -52,6 +55,7 @@ class UserModel {
         orElse: () => UserRole.rider,
       ),
       isUnionVerified: map['isUnionVerified'] as bool? ?? false,
+      vehicleInfo: map['vehicleInfo'] as String?,
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'] as String)
           : DateTime.now(),

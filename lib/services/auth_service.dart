@@ -64,15 +64,16 @@ class AuthService {
   FirebaseAuth get _instance => _firebaseAuth ?? FirebaseAuth.instance;
 
   /// Converts a Firebase [User] to a RideSathi [UserModel].
-  UserModel? _userFromFirebase(User? user, {String? name, String? phone}) {
+  UserModel? _userFromFirebase(User? user, {String? name, String? phone, UserRole role = UserRole.rider, String? vehicleInfo}) {
     if (user == null) return null;
     return UserModel(
       id: user.uid,
       name: name ?? user.displayName ?? user.email?.split('@').first ?? 'RideSathi User',
       phoneNumber: phone ?? user.phoneNumber ?? '',
       email: user.email,
-      role: UserRole.rider,
+      role: role,
       isUnionVerified: false,
+      vehicleInfo: vehicleInfo,
       createdAt: DateTime.now(),
     );
   }
@@ -106,13 +107,15 @@ class AuthService {
     required String password,
     String? name,
     String? phone,
+    UserRole role = UserRole.rider,
+    String? vehicleInfo,
   }) async {
     try {
       final credential = await _instance.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      return _userFromFirebase(credential.user, name: name, phone: phone);
+      return _userFromFirebase(credential.user, name: name, phone: phone, role: role, vehicleInfo: vehicleInfo);
     } catch (e) {
       throw AuthException.from(e);
     }
@@ -138,8 +141,10 @@ class AuthService {
     required String password,
     String? name,
     String? phone,
+    UserRole role = UserRole.rider,
+    String? vehicleInfo,
   }) =>
-      const AuthService().userSignUp(email: email, password: password, name: name, phone: phone);
+      const AuthService().userSignUp(email: email, password: password, name: name, phone: phone, role: role, vehicleInfo: vehicleInfo);
 
   static Future<UserModel?> signIn({
     required String email,

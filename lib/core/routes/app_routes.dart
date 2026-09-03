@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
+import '../../screens/auth/driver_signup_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
@@ -12,6 +13,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String driverSignup = '/driver-signup';
 
   // Future Role-Specific Route Placeholders (for PR 06+ Rider/Driver/Dispatcher modules)
   static const String riderHome = '/rider/home';
@@ -39,6 +41,11 @@ class AppRoutes {
       case signup:
         return MaterialPageRoute(
           builder: (_) => const SignupScreen(),
+          settings: settings,
+        );
+      case driverSignup:
+        return MaterialPageRoute(
+          builder: (_) => const DriverSignupScreen(),
           settings: settings,
         );
       default:
@@ -124,6 +131,11 @@ class AppNavigator {
   /// Navigates from Login to Signup (or pushes Signup).
   static Future<void> toSignup(BuildContext context) {
     return pushReplacementNamed(context, AppRoutes.signup);
+  }
+
+  /// Navigates from Login to Driver Signup (or pushes Driver Signup).
+  static Future<void> toDriverSignup(BuildContext context) {
+    return pushReplacementNamed(context, AppRoutes.driverSignup);
   }
 
   /// Logs out and resets the navigation stack to the Login screen.

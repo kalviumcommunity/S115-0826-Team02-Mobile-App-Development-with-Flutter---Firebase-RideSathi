@@ -166,6 +166,54 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Registers a new driver with email and password, then creates their driver profile document in Firestore.
+  Future<bool> signUpDriver({
+    required String email,
+    required String password,
+    required String name,
+    required String phone,
+    required String vehicleInfo,
+  }) async {
+    _setState(AuthState.authenticating(previousUser: _state.user));
+    try {
+      final user = await _authService.userSignUp(
+        email: email,
+        password: password,
+        name: name,
+        phone: phone,
+        role: UserRole.driver,
+        vehicleInfo: vehicleInfo,
+      );
+      if (user != null) {
+        try {
+          await _userProfileService.createDriverProfile(user);
+        } catch (e) {
+          final errorMsg = e is FirestoreException
+              ? e.message
+              : 'Account created, but failed to save driver profile.';
+          _setState(AuthState.error(errorMsg));
+          return false;
+        }
+        _setState(AuthState.authenticated(user));
+        return true;
+      } else {
+        _setState(const AuthState.error('Failed to create account.'));
+        return false;
+      }
+    } on AuthException catch (e) {
+      _setState(AuthState.error(e.message));
+      return false;
+    } on FirestoreException catch (e) {
+      _setState(AuthState.error(e.message));
+      return false;
+    } catch (e) {
+      _setState(const AuthState.error(
+        'An unexpected error occurred. Please try again.',
+      ));
+      return false;
+    }
+  }
+
   /// Signs out the currently authenticated user.
   Future<bool> signOut() async {
     try {

@@ -55,6 +55,8 @@ class TestAuthService extends AuthService {
     required String password,
     String? name,
     String? phone,
+    UserRole role = UserRole.rider,
+    String? vehicleInfo,
   }) async {
     if (shouldThrow) {
       throw exceptionToThrow ??
@@ -66,8 +68,9 @@ class TestAuthService extends AuthService {
       name: name ?? 'New User',
       phoneNumber: phone ?? '',
       email: email,
-      role: UserRole.rider,
+      role: role,
       isUnionVerified: false,
+      vehicleInfo: vehicleInfo,
       createdAt: DateTime.now(),
     );
     _streamController.add(mockUser);
@@ -254,6 +257,24 @@ void main() {
       expect(user, isNotNull);
       expect(user!.name, equals('New Rider'));
       expect(user.phoneNumber, equals('+919999988888'));
+      expect(user.role, equals(UserRole.rider));
+      expect(authService.currentAuthUser, equals(user));
+    });
+
+    test('userSignUp with driver role returns valid UserModel and updates state', () async {
+      final user = await authService.userSignUp(
+        email: 'driver@ridesathi.com',
+        password: 'securePassword!',
+        name: 'New Driver',
+        phone: '+919999988889',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto DL-01',
+      );
+
+      expect(user, isNotNull);
+      expect(user!.name, equals('New Driver'));
+      expect(user.role, equals(UserRole.driver));
+      expect(user.vehicleInfo, equals('Auto DL-01'));
       expect(authService.currentAuthUser, equals(user));
     });
 
