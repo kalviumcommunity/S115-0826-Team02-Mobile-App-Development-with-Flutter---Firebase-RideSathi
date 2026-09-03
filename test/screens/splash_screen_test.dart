@@ -3,18 +3,55 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
+import 'package:ridesathi/core/state/auth_controller.dart';
+import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/core/theme/app_theme.dart';
+import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/splash_screen.dart';
+import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
+import 'package:ridesathi/services/firestore_exception.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/widgets/error_view.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
+
+class FakeSplashAuthService extends AuthService {
+  final UserModel? mockUser;
+  const FakeSplashAuthService({this.mockUser});
+
+  @override
+  UserModel? get currentAuthUser => mockUser;
+}
+
+class FakeSplashUserProfileService extends UserProfileService {
+  bool shouldFail;
+  UserModel? profileToReturn;
+
+  FakeSplashUserProfileService({this.shouldFail = false, this.profileToReturn});
+
+  @override
+  Future<UserModel?> getUserProfile(String uid) async {
+    if (shouldFail) {
+      throw const FirestoreException('Network error during session restoration');
+    }
+    return profileToReturn;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
   /// Wraps the SplashScreen in a MaterialApp with the real route generator.
-  Widget buildSplashApp({ThemeData? theme}) {
+  Widget buildSplashApp({ThemeData? theme, AuthController? authController}) {
+    if (authController != null) {
+      return MaterialApp(
+        theme: theme ?? AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        home: SplashScreen(authController: authController),
+        onGenerateRoute: AppRoutes.generateRoute,
+      );
+    }
     return MaterialApp(
       theme: theme ?? AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -24,13 +61,15 @@ void main() {
   }
 
   setUp(() {
-    // Reset Firebase state before each test.
+    // Reset Firebase and Auth state before each test.
     FirebaseService.isInitializedOverride = false;
+    AuthController.resetInstance();
   });
 
   tearDown(() {
     // Ensure clean state after each test.
     FirebaseService.isInitializedOverride = false;
+    AuthController.resetInstance();
   });
 
   group('SplashScreen — Branding & Rendering', () {
@@ -242,6 +281,153 @@ void main() {
       expect(find.byType(SplashScreen), findsOneWidget);
       expect(find.text(AppConstants.appName), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+  });
+
+  group('SplashScreen — AuthController Session Restoration', () {
+    testWidgets('navigates to /home when user is authenticated with valid profile',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final dummyUser = UserModel(
+        id: 'rider-splash-1',
+        name: 'Splash Rider',
+        phoneNumber: '9876543210',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+      final controller = AuthController(
+        initialState: AuthState.authenticated(dummyUser),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+
+      expect(find.byType(SplashScreen), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+    });
+
+    testWidgets('navigates to /login when user is unauthenticated',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final controller = AuthController(
+        initialState: const AuthState.unauthenticated(),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('Sign in to continue'), findsOneWidget);
+    });
+
+    testWidgets('shows ErrorView when session restoration fails with error',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final controller = AuthController(
+        initialState: const AuthState.error(
+          'User session active, but profile could not be found.',
+        ),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump();
+
+      expect(find.byType(ErrorView), findsOneWidget);
+      expect(
+        find.text('User session active, but profile could not be found.'),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+    });
+
+    testWidgets('waits for restoration to complete even if timer fires first',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final controller = AuthController(
+        initialState: const AuthState.authenticating(),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+
+      // Advance past timer (2200ms) while still authenticating
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump();
+
+      // Should still be on SplashScreen because restoration has not reached definitive state
+      expect(find.byType(SplashScreen), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Now restoration completes to unauthenticated
+      controller.updateState(const AuthState.unauthenticated());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      // Navigates to login
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('Sign in to continue'), findsOneWidget);
+    });
+
+    testWidgets('retry on splash error initiates retry and navigates on recovery',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+
+      final dummyUser = UserModel(
+        id: 'recovered-driver-1',
+        name: 'Recovered Driver',
+        phoneNumber: '9876543210',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto DL-01',
+        createdAt: DateTime.now(),
+      );
+
+      final fakeAuth = FakeSplashAuthService(mockUser: dummyUser);
+      final fakeProfile = FakeSplashUserProfileService(
+        shouldFail: true,
+      );
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: const AuthState.error(
+          'Network error during session restoration',
+        ),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump();
+
+      expect(find.byType(ErrorView), findsOneWidget);
+      expect(
+        find.text('Network error during session restoration'),
+        findsOneWidget,
+      );
+
+      // Now service recovers
+      fakeProfile.shouldFail = false;
+      fakeProfile.profileToReturn = dummyUser;
+
+      await tester.tap(find.text('Retry'));
+      await tester.pump();
+
+      // Advance retry timer (800ms) + let async navigation complete
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('Welcome to RideSathi'), findsOneWidget);
     });
   });
 }
