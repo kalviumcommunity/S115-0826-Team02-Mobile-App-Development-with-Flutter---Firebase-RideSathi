@@ -82,7 +82,7 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
 
     if (!mounted) return;
     if (success) {
-      AppNavigator.toHome(context);
+      AppNavigator.toAuthenticatedHome(context, _authController.currentUser);
     }
   }
 

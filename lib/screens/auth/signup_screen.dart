@@ -79,7 +79,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!mounted) return;
     if (success) {
-      AppNavigator.toHome(context);
+      AppNavigator.toAuthenticatedHome(context, _authController.currentUser);
     }
   }
 
