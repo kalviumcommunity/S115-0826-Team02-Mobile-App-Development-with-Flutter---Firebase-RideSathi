@@ -143,7 +143,7 @@ class SplashScreenState extends State<SplashScreen>
     _hasNavigated = true;
 
     if (_authController.isAuthenticated) {
-      AppNavigator.toHome(context);
+      AppNavigator.toAuthenticatedHome(context, _authController.currentUser);
     } else {
       AppNavigator.toLogin(context);
     }

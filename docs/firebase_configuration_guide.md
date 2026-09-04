@@ -154,17 +154,13 @@ Complete domain UserModel (role: rider | driver, vehicleInfo, phone, etc.)
     ↓
 AuthState.authenticated(userModel)
     ↓
-AppNavigator.toHome(context) [Navigates to Home; PR 16 will introduce role-based routing]
+AppNavigator.toAuthenticatedHome(context, userModel)
 ```
 
 ### Missing Profile & Invalid Role Strategy:
 - **Missing Profile (`users/{uid}` absent)**: If a user authenticates with Firebase Auth credentials but has no Firestore document, login fails with a clear, recoverable error (`User profile not found. Please contact support or register again.`) and does not falsely mark the session as authenticated.
 - **Invalid/Unsupported Role**: If a Firestore profile contains an unmapped/corrupted role string, `UserModel.fromMap` throws a `FormatException` which `UserProfileService` wraps into a `FirestoreException` (`User profile data is corrupted or contains an invalid role.`).
 - **Session Persistence**: On application restart, `AuthController.checkAuthStatus()` reads `currentAuthUser` from `AuthService` and re-resolves the latest `UserModel` profile from `UserProfileService`.
-
-### Known Limitations & Roadmap Boundaries:
-- **Role-Based Routing (PR 16)**: Home dashboard redirection based on `UserModel.role` is scheduled for PR 16. Current login flows land on `/home`.
-- **Firestore Security Rules (PR 55/56)**: Cloud security rules enforcement is scheduled for the backend hardening milestone. Client role properties are verified at the domain boundary.
 
 ---
 
@@ -195,7 +191,9 @@ Firebase Auth checks native persistent session (AuthService.currentAuthUser)
        Resolve domain profile: UserProfileService.getUserProfile(uid)
             ├── Profile found & valid → AuthState.authenticated(userModel)
             │                                ↓
-            │                         SplashScreen awaits branding timer → AppNavigator.toHome(context)
+            │                         SplashScreen awaits branding timer → AppNavigator.toAuthenticatedHome(context, userModel)
+            │                                                                 ├── rider → /rider/home
+            │                                                                 └── driver → /driver/home
             ├── Profile missing (null document) → AuthState.error('User session active, but profile could not be found.')
             │                                ↓
             │                         SplashScreen shows ErrorView with Retry button
@@ -207,17 +205,22 @@ Firebase Auth checks native persistent session (AuthService.currentAuthUser)
                                       SplashScreen shows ErrorView with Retry button
 ```
 
-### Deterministic Concurrency & Deduplication
-- **In-Flight Deduplication**: Concurrent calls to `AuthController.checkAuthStatus()` share an in-flight `Future<void>`, preventing redundant Firestore profile fetches and avoiding race conditions during application boot.
-- **Stream vs Boot Deduplication**: When `onAuthStateChanged` fires an event for a UID currently undergoing restoration or already authenticated with an identical user, redundant profile queries are bypassed.
-- **Disposal Safety**: `AuthController` tracks its disposed state (`_isDisposed`). Any asynchronous restoration or stream event finishing after controller disposal is prevented from calling `notifyListeners()`.
+---
 
-### Error Boundaries & Failure Recovery
-1. **Missing Profile Document**: If Firebase Auth holds a session but Firestore document `users/{uid}` does not exist, the session is never marked authenticated. Instead, an `AuthState.error` is raised. The user sees a retry action or can navigate back to sign up.
-2. **Invalid / Corrupted Profile**: If the Firestore record contains unsupported role strings or malformed data, `UserModel.fromMap` fails fast with a `FormatException`, surfaced as a `FirestoreException` and mapped to `AuthState.error`. Privileged access is strictly denied.
-3. **Network Failure on Startup**: If connectivity is lost during startup restoration, the error state is displayed with a "Retry" button. Tapping retry invokes `AuthController.retryRestoration()`, attempting resolution again without discarding the persisted Firebase credentials.
-4. **Sign-Out Clears Domain State**: `AuthController.signOut()` signs out from Firebase Auth and resets in-memory `AuthState` to `AuthState.unauthenticated()`, purging user profile, vehicle information, and role cache. Subsequent logins always perform a clean fetch from Firestore.
+## 10. Role-Based Routing & Route Protection (PR 16)
 
-### Architectural Boundaries & Deferred Scope
-- **Generic Navigation Preserved**: Until PR 16 implements role-based routing (`/rider/home` vs `/driver/home`), authenticated sessions restore and navigate to `/home`, and unauthenticated sessions navigate to `/login`.
-- **No Direct Firebase Calls in UI**: `SplashScreen` and screens interact solely with `AuthController` and service contracts, ensuring full testability with mock test doubles.
+### Routing Principle
+> **Authentication proves identity; the restored domain `UserModel.role` determines the application destination.**
+
+```text
+AppNavigator.toAuthenticatedHome(context, userModel)
+  ├── UserRole.rider  → /rider/home (RiderHomeScreen)
+  └── UserRole.driver → /driver/home (DriverHomeScreen)
+```
+
+### Route Protection & Cross-Role Guards:
+1. **Unauthenticated Route Access**: Attempting to navigate directly to `/rider/home` or `/driver/home` without an active session automatically redirects to `/login`.
+2. **Cross-Role Protection**: A user logged in as `UserRole.rider` attempting to access `/driver/home` is automatically redirected to `/rider/home`. Similarly, a `UserRole.driver` attempting `/rider/home` is redirected to `/driver/home`.
+3. **Logout Stack Clearing**: `AppNavigator.logout(context)` clears the entire navigation back stack to `/login`, ensuring pressing Back cannot reopen an authenticated screen.
+4. **Unsupported Role Protection**: If an authenticated model possesses an unsupported role, navigation routes to an `ErrorView` rather than granting arbitrary access.
+5. **Scope Boundaries**: Full booking workflow belongs to PR 19 (Rider Home), driver dispatch belongs to PR 29 (Driver Dashboard), and cloud authorization rules belong to PR 55/56 (Firestore Security Rules).

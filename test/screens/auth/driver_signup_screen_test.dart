@@ -210,8 +210,9 @@ void main() {
       expect(fakeProfile.savedProfile!.phoneNumber, equals('9876543210'));
       expect(fakeProfile.savedProfile!.role, equals(UserRole.driver));
       expect(fakeProfile.savedProfile!.vehicleInfo, equals('Auto DL-01-AB-1234'));
-      // Navigates to home screen
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      // Navigates to driver home screen
+      expect(find.text('RideSathi Driver'), findsOneWidget);
+      expect(find.text('Welcome, Vikram Singh'), findsOneWidget);
     });
   });
 

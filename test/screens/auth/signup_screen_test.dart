@@ -203,8 +203,9 @@ void main() {
       expect(fakeProfile.savedProfile!.name, equals('Deepak Verma'));
       expect(fakeProfile.savedProfile!.phoneNumber, equals('9876543210'));
       expect(fakeProfile.savedProfile!.role, equals(UserRole.rider));
-      // Navigates to home screen
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      // Navigates to rider home screen
+      expect(find.text('RideSathi Rider'), findsOneWidget);
+      expect(find.text('Welcome, Deepak Verma'), findsOneWidget);
     });
   });
 

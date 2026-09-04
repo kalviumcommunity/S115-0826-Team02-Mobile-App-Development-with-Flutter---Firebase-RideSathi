@@ -285,7 +285,7 @@ void main() {
   });
 
   group('SplashScreen — AuthController Session Restoration', () {
-    testWidgets('navigates to /home when user is authenticated with valid profile',
+    testWidgets('navigates to /rider/home when rider user is authenticated with valid profile',
         (WidgetTester tester) async {
       FirebaseService.isInitializedOverride = true;
       final dummyUser = UserModel(
@@ -308,7 +308,36 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(SplashScreen), findsNothing);
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      expect(find.text('RideSathi Rider'), findsOneWidget);
+      expect(find.text('Welcome, Splash Rider'), findsOneWidget);
+    });
+
+    testWidgets('navigates to /driver/home when driver user is authenticated with valid profile',
+        (WidgetTester tester) async {
+      FirebaseService.isInitializedOverride = true;
+      final dummyDriver = UserModel(
+        id: 'driver-splash-1',
+        name: 'Driver Splash',
+        phoneNumber: '9876543210',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto DL-01-AB-1234',
+        createdAt: DateTime.now(),
+      );
+      final controller = AuthController(
+        initialState: AuthState.authenticated(dummyDriver),
+      );
+
+      await tester.pumpWidget(buildSplashApp(authController: controller));
+
+      expect(find.byType(SplashScreen), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(SplashScreen), findsNothing);
+      expect(find.text('RideSathi Driver'), findsOneWidget);
+      expect(find.text('Welcome, Driver Splash'), findsOneWidget);
     });
 
     testWidgets('navigates to /login when user is unauthenticated',
@@ -427,7 +456,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(SplashScreen), findsNothing);
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      expect(find.text('RideSathi Driver'), findsOneWidget);
+      expect(find.text('Welcome, Recovered Driver'), findsOneWidget);
     });
   });
 }

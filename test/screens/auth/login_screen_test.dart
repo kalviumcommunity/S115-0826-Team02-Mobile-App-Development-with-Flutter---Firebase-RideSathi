@@ -165,7 +165,8 @@ void main() {
 
       expect(customController.isAuthenticated, isTrue);
       expect(customController.currentUser!.name, equals('Rider Ramesh'));
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      expect(find.text('RideSathi Rider'), findsOneWidget);
+      expect(find.text('Welcome, Rider Ramesh'), findsOneWidget);
     });
 
     testWidgets('submits driver credentials, resolves driver profile, and navigates to home',
@@ -201,7 +202,8 @@ void main() {
       expect(customController.isAuthenticated, isTrue);
       expect(customController.currentUser!.role, equals(UserRole.driver));
       expect(customController.currentUser!.vehicleInfo, equals('Auto KA-01-1234'));
-      expect(find.text('Welcome to RideSathi'), findsOneWidget);
+      expect(find.text('RideSathi Driver'), findsOneWidget);
+      expect(find.text('Welcome, Driver Dharmendra'), findsOneWidget);
     });
 
     testWidgets('shows error when profile is missing in Firestore',
