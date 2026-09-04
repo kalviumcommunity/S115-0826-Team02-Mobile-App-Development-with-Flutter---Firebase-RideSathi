@@ -250,5 +250,67 @@ void main() {
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(AppNavigator.canPop(tester.element(find.byType(LoginScreen))), isFalse);
     });
+
+    testWidgets('logout from RiderHomeScreen resets stack to LoginScreen and clears history', (tester) async {
+      final riderController = AuthController.instance;
+      riderController.updateState(AuthState.authenticated(dummyRider));
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.login));
+      await tester.pumpAndSettle();
+
+      final BuildContext context = tester.element(find.byType(LoginScreen));
+      AppNavigator.toRiderHome(context, dummyRider);
+      await tester.pumpAndSettle();
+      expect(find.byType(RiderHomeScreen), findsOneWidget);
+
+      final BuildContext riderContext = tester.element(find.byType(RiderHomeScreen));
+      AppNavigator.logout(riderContext);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(AppNavigator.canPop(tester.element(find.byType(LoginScreen))), isFalse);
+    });
+
+    testWidgets('logout from DriverHomeScreen resets stack to LoginScreen and clears history', (tester) async {
+      final driverController = AuthController.instance;
+      driverController.updateState(AuthState.authenticated(dummyDriver));
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.login));
+      await tester.pumpAndSettle();
+
+      final BuildContext context = tester.element(find.byType(LoginScreen));
+      AppNavigator.toDriverHome(context, dummyDriver);
+      await tester.pumpAndSettle();
+      expect(find.byType(DriverHomeScreen), findsOneWidget);
+
+      final BuildContext driverContext = tester.element(find.byType(DriverHomeScreen));
+      AppNavigator.logout(driverContext);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(AppNavigator.canPop(tester.element(find.byType(LoginScreen))), isFalse);
+    });
+
+    testWidgets('unauthenticated direct navigation to riderHome redirects to LoginScreen', (tester) async {
+      final unauthController = AuthController.instance;
+      unauthController.updateState(const AuthState.unauthenticated());
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.riderHome));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(RiderHomeScreen), findsNothing);
+    });
+
+    testWidgets('unauthenticated direct navigation to driverHome redirects to LoginScreen', (tester) async {
+      final unauthController = AuthController.instance;
+      unauthController.updateState(const AuthState.unauthenticated());
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.driverHome));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(DriverHomeScreen), findsNothing);
+    });
   });
 }

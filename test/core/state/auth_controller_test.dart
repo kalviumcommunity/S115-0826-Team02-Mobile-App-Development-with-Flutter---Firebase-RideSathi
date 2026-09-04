@@ -95,10 +95,12 @@ class FakeTestUserProfileService extends UserProfileService {
   final Map<String, UserModel> _profiles = {};
   UserModel? savedProfile;
   int getUserProfileCallCount = 0;
+  Completer<UserModel?>? profileCompleter;
 
   FakeTestUserProfileService({
     this.shouldFail = false,
     this.failureMessage = 'Firestore error',
+    this.profileCompleter,
   });
 
   void setProfile(String uid, UserModel profile) {
@@ -127,10 +129,43 @@ class FakeTestUserProfileService extends UserProfileService {
   @override
   Future<UserModel?> getUserProfile(String uid) async {
     getUserProfileCallCount++;
+    if (profileCompleter != null) {
+      return profileCompleter!.future;
+    }
     if (shouldFail) {
       throw FirestoreException(failureMessage);
     }
     return _profiles[uid] ?? savedProfile;
+  }
+}
+
+/// Fake implementation of [AuthService] tracking sign out calls for PR 17 tests.
+class SignOutTrackingAuthService extends FakeAuthService {
+  int signOutCallCount = 0;
+  Completer<void>? signOutCompleter;
+  final bool shouldFailSignOut;
+  final bool shouldThrowGenericException;
+
+  SignOutTrackingAuthService({
+    this.shouldFailSignOut = false,
+    this.shouldThrowGenericException = false,
+    this.signOutCompleter,
+    super.streamController,
+    super.mockCurrentAuthUser,
+  });
+
+  @override
+  Future<void> userSignOut() async {
+    signOutCallCount++;
+    if (signOutCompleter != null) {
+      await signOutCompleter!.future;
+    }
+    if (shouldFailSignOut) {
+      throw const AuthException('Network error during sign out.');
+    }
+    if (shouldThrowGenericException) {
+      throw Exception('Unexpected system failure.');
+    }
   }
 }
 
@@ -1112,6 +1147,315 @@ void main() {
       expect(login2, isTrue);
       expect(controller.currentUser!.name, equals('Driver Updated Name'));
       expect(controller.currentUser!.vehicleInfo, equals('Electric Auto DL-01-2222'));
+    });
+  });
+
+  group('AuthController — PR 17 Hardened Logout & Session Teardown', () {
+    final testRider = UserModel(
+      id: 'pr17-rider-id',
+      name: 'Rider Teardown',
+      phoneNumber: '9876543210',
+      email: 'rider.teardown@ridesathi.com',
+      role: UserRole.rider,
+      createdAt: DateTime.now(),
+    );
+
+    final testDriver = UserModel(
+      id: 'pr17-driver-id',
+      name: 'Driver Teardown',
+      phoneNumber: '9988776655',
+      email: 'driver.teardown@ridesathi.com',
+      role: UserRole.driver,
+      vehicleInfo: 'Auto KA-05-1234',
+      isUnionVerified: true,
+      createdAt: DateTime.now(),
+    );
+
+    test('successful signOut clears all user, role, and domain state', () async {
+      final fakeAuth = SignOutTrackingAuthService(mockCurrentAuthUser: testDriver);
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testDriver.id, testDriver);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testDriver),
+      );
+
+      expect(controller.isAuthenticated, isTrue);
+      expect(controller.currentUser, isNotNull);
+
+      final result = await controller.signOut();
+
+      expect(result, isTrue);
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.state.isUnauthenticated, isTrue);
+      expect(controller.currentUser, isNull);
+      expect(controller.errorMessage, isNull);
+      expect(fakeAuth.signOutCallCount, equals(1));
+    });
+
+    test('concurrent signOut invocations are deduplicated to a single operation', () async {
+      final completer = Completer<void>();
+      final fakeAuth = SignOutTrackingAuthService(
+        mockCurrentAuthUser: testRider,
+        signOutCompleter: completer,
+      );
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testRider.id, testRider);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testRider),
+      );
+
+      // Start two concurrent sign-out calls
+      final future1 = controller.signOut();
+      final future2 = controller.signOut();
+
+      expect(fakeAuth.signOutCallCount, equals(1));
+
+      completer.complete();
+      final results = await Future.wait([future1, future2]);
+
+      expect(results[0], isTrue);
+      expect(results[1], isTrue);
+      expect(fakeAuth.signOutCallCount, equals(1));
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.state.isUnauthenticated, isTrue);
+    });
+
+    test('profile restoration in flight is cancelled and cannot re-authenticate after signOut', () async {
+      final profileCompleter = Completer<UserModel?>();
+      final fakeAuth = SignOutTrackingAuthService(mockCurrentAuthUser: testDriver);
+      final fakeProfile = FakeTestUserProfileService(profileCompleter: profileCompleter);
+
+      FirebaseService.isInitializedOverride = true;
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      // Trigger restoration (which stalls on profile fetch)
+      final restorationFuture = controller.checkAuthStatus();
+      await pumpEventQueue();
+
+      expect(controller.state.isAuthenticating, isTrue);
+      expect(fakeProfile.getUserProfileCallCount, equals(1));
+
+      // User signs out while Firestore profile request is in-flight
+      final signOutFuture = controller.signOut();
+      await signOutFuture;
+
+      expect(controller.state.isUnauthenticated, isTrue);
+      expect(controller.currentUser, isNull);
+
+      // Firestore profile request now completes with the old driver profile
+      profileCompleter.complete(testDriver);
+      await restorationFuture;
+      await pumpEventQueue();
+
+      // Crucial assertion: State must NOT revert to authenticated!
+      expect(controller.state.isUnauthenticated, isTrue);
+      expect(controller.isAuthenticated, isFalse);
+      expect(controller.currentUser, isNull);
+    });
+
+    test('onAuthStateChanged null event clears session and avoids redundant notifications', () async {
+      final streamController = StreamController<UserModel?>.broadcast();
+      final fakeAuth = SignOutTrackingAuthService(
+        streamController: streamController,
+        mockCurrentAuthUser: testRider,
+      );
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testRider.id, testRider);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testRider),
+        listenToAuthChanges: true,
+      );
+
+      int notificationCount = 0;
+      controller.addListener(() => notificationCount++);
+
+      // Sign out directly through controller
+      await controller.signOut();
+      expect(controller.state.isUnauthenticated, isTrue);
+      final notificationsAfterSignOut = notificationCount;
+
+      // Stream emits null subsequently (standard Firebase Auth behavior on sign-out)
+      streamController.add(null);
+      await pumpEventQueue();
+
+      // State remains unauthenticated, and duplicate notification is suppressed
+      expect(controller.state.isUnauthenticated, isTrue);
+      expect(notificationCount, equals(notificationsAfterSignOut));
+
+      await streamController.close();
+    });
+
+    test('external sign-out via stream invalidates in-flight restoration', () async {
+      final profileCompleter = Completer<UserModel?>();
+      final streamController = StreamController<UserModel?>.broadcast();
+      final fakeAuth = SignOutTrackingAuthService(
+        streamController: streamController,
+      );
+      final fakeProfile = FakeTestUserProfileService(profileCompleter: profileCompleter);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        listenToAuthChanges: true,
+      );
+
+      // Stream emits user (restoration starts)
+      streamController.add(testRider);
+      await pumpEventQueue();
+      expect(fakeProfile.getUserProfileCallCount, equals(1));
+
+      // External sign-out occurs before profile fetch finishes
+      streamController.add(null);
+      await pumpEventQueue();
+      expect(controller.state.isUnauthenticated, isTrue);
+
+      // In-flight profile completes
+      profileCompleter.complete(testRider);
+      await pumpEventQueue();
+
+      // Stale restoration must NOT re-authenticate
+      expect(controller.state.isUnauthenticated, isTrue);
+      expect(controller.currentUser, isNull);
+
+      await streamController.close();
+    });
+
+    test('signOut failure via AuthException sets error state and preserves previous user for retry', () async {
+      final fakeAuth = SignOutTrackingAuthService(
+        mockCurrentAuthUser: testDriver,
+        shouldFailSignOut: true,
+      );
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testDriver.id, testDriver);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testDriver),
+      );
+
+      final success = await controller.signOut();
+
+      expect(success, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(controller.errorMessage, equals('Network error during sign out.'));
+      // Previous user is preserved in error state so UI can display context and allow retry
+      expect(controller.currentUser, equals(testDriver));
+    });
+
+    test('signOut failure via generic exception sets user-friendly error message and preserves user', () async {
+      final fakeAuth = SignOutTrackingAuthService(
+        mockCurrentAuthUser: testRider,
+        shouldThrowGenericException: true,
+      );
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testRider.id, testRider);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testRider),
+      );
+
+      final success = await controller.signOut();
+
+      expect(success, isFalse);
+      expect(controller.state.isError, isTrue);
+      expect(controller.errorMessage, equals('Failed to sign out. Please try again.'));
+      expect(controller.currentUser, equals(testRider));
+    });
+
+    test('calling dispose during in-flight signOut safely suppresses notifications and throws no error', () async {
+      final completer = Completer<void>();
+      final fakeAuth = SignOutTrackingAuthService(
+        mockCurrentAuthUser: testRider,
+        signOutCompleter: completer,
+      );
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testRider.id, testRider);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+        initialState: AuthState.authenticated(testRider),
+      );
+
+      bool notifiedAfterDisposal = false;
+      controller.addListener(() {
+        notifiedAfterDisposal = true;
+      });
+
+      final signOutFuture = controller.signOut();
+      controller.dispose();
+
+      completer.complete();
+      final result = await signOutFuture;
+
+      expect(result, isTrue);
+      expect(notifiedAfterDisposal, isFalse);
+    });
+
+    test('signOut on already disposed controller returns false immediately', () async {
+      final fakeAuth = SignOutTrackingAuthService();
+      final controller = AuthController(authService: fakeAuth);
+      controller.dispose();
+
+      final result = await controller.signOut();
+
+      expect(result, isFalse);
+      expect(fakeAuth.signOutCallCount, equals(0));
+    });
+
+    test('re-login after signOut restores fresh authenticated session for rider', () async {
+      final fakeAuth = FakeAuthService();
+      final fakeProfile = FakeTestUserProfileService()..setProfile(testRider.id, testRider);
+
+      final controller = AuthController(
+        authService: fakeAuth,
+        userProfileService: fakeProfile,
+      );
+
+      // 1. Initial login
+      final loggedIn = await controller.signIn(
+        email: testRider.email!,
+        password: 'password123',
+      );
+      expect(loggedIn, isTrue);
+      expect(controller.currentUser!.name, equals('Rider Teardown'));
+      expect(controller.currentUser!.role, equals(UserRole.rider));
+
+      // 2. Sign out
+      final signedOut = await controller.signOut();
+      expect(signedOut, isTrue);
+      expect(controller.currentUser, isNull);
+      expect(controller.state.isUnauthenticated, isTrue);
+
+      // 3. Profile update in Firestore
+      final updatedRider = UserModel(
+        id: testRider.id,
+        name: 'Rider Fresh Name',
+        phoneNumber: '9111222333',
+        email: testRider.email,
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+      fakeProfile.setProfile(testRider.id, updatedRider);
+
+      // 4. Re-login
+      final reLoggedIn = await controller.signIn(
+        email: testRider.email!,
+        password: 'password123',
+      );
+      expect(reLoggedIn, isTrue);
+      expect(controller.currentUser!.name, equals('Rider Fresh Name'));
+      expect(controller.currentUser!.phoneNumber, equals('9111222333'));
+      expect(controller.currentUser!.role, equals(UserRole.rider));
     });
   });
 }

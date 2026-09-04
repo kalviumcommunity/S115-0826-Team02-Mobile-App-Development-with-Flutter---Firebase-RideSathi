@@ -224,3 +224,36 @@ AppNavigator.toAuthenticatedHome(context, userModel)
 3. **Logout Stack Clearing**: `AppNavigator.logout(context)` clears the entire navigation back stack to `/login`, ensuring pressing Back cannot reopen an authenticated screen.
 4. **Unsupported Role Protection**: If an authenticated model possesses an unsupported role, navigation routes to an `ErrorView` rather than granting arbitrary access.
 5. **Scope Boundaries**: Full booking workflow belongs to PR 19 (Rider Home), driver dispatch belongs to PR 29 (Driver Dashboard), and cloud authorization rules belong to PR 55/56 (Firestore Security Rules).
+
+---
+
+## 11. Production Logout & Session Teardown Flow (PR 17)
+
+### Target Lifecycle
+```text
+Authenticated UserModel (Rider or Driver)
+        ↓
+User taps Logout in AppBar (RiderHomeScreen / DriverHomeScreen)
+        ↓
+AuthController.signOut()
+        ↓
+AuthService.userSignOut()
+        ↓
+Firebase Auth session cleared (Keychain / Keystore / IndexedDB)
+        ↓
+Domain AuthState cleared -> AuthState.unauthenticated()
+        ↓
+AppNavigator.logout(context) -> pushNamedAndRemoveUntil(login, false)
+        ↓
+/login (Stack root, canPop == false)
+```
+
+### Teardown Contracts & Invariants:
+1. **Domain State Removal**: Upon sign-out, `AuthState` transitions to `AuthState.unauthenticated()`. The controller's `currentUser` becomes `null`, wiping all previous domain information (role, name, phone, `vehicleInfo`, `isUnionVerified`).
+2. **Restoration Race-Condition Protection**: A monotonically increasing `_sessionGeneration` token invalidates any in-flight profile restoration or background network call. If `signOut()` is invoked while a profile fetch from Firestore is awaiting, the returned profile is dropped and cannot re-authenticate the session.
+3. **Concurrency & Deduplication**: Concurrent invocations of `AuthController.signOut()` return the existing active `Future<bool>`, preventing redundant calls to `AuthService.userSignOut()`. In the UI, the logout button enters a loading state (`_isLoggingOut = true`) with an inline circular spinner and disables further taps.
+4. **Auth Stream Determinism**: When `FirebaseAuth.signOut()` emits `null` via `authStateChanges`, the listener synchronizes state idempotently without duplicate notifications or transient errors.
+5. **Back-Button & Route Protection**: `AppNavigator.logout(context)` wipes all prior routes from the navigator stack. If an unauthenticated user attempts direct entry into `/rider/home` or `/driver/home` (e.g. via browser navigation or manual route push), `AppRoutes.generateRoute` intercepts and redirects them to `/login`.
+6. **Disposal Lifecycle Guards**: `AuthController.dispose()` sets `_isDisposed = true`, increments `_sessionGeneration`, and cancels the auth stream subscription, preventing post-disposal `notifyListeners()`.
+7. **Known Limitation**: Client-side session teardown and route protection enforce local UI boundaries but do not replace server-enforced Cloud Firestore Security Rules (scheduled for PR 55/56).
+
