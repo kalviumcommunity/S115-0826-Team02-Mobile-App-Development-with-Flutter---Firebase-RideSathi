@@ -43,4 +43,12 @@ class Validators {
     }
     return null;
   }
+
+  /// Validates vehicle information: required, not whitespace-only, min 2 characters.
+  static String? vehicleInfo(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Vehicle info is required.';
+    if (trimmed.length < 2) return 'Vehicle info must be at least 2 characters.';
+    return null;
+  }
 }

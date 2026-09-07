@@ -113,6 +113,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.person_outline_rounded),
+            tooltip: 'Profile',
+            onPressed: () => AppNavigator.toProfile(context),
+          ),
+          IconButton(
             icon: _isLoggingOut
                 ? SizedBox(
                     height: 20,

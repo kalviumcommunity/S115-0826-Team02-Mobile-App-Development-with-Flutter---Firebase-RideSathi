@@ -10,6 +10,7 @@ import 'package:ridesathi/screens/auth/driver_signup_screen.dart';
 import 'package:ridesathi/screens/auth/login_screen.dart';
 import 'package:ridesathi/screens/auth/signup_screen.dart';
 import 'package:ridesathi/screens/driver/driver_home_screen.dart';
+import 'package:ridesathi/screens/profile/profile_screen.dart';
 import 'package:ridesathi/screens/rider/rider_home_screen.dart';
 import 'package:ridesathi/screens/splash_screen.dart';
 import 'package:ridesathi/widgets/error_view.dart';
@@ -55,6 +56,9 @@ void main() {
       expect(AppRoutes.driverSignup, '/driver-signup');
       expect(AppRoutes.riderHome, '/rider/home');
       expect(AppRoutes.driverHome, '/driver/home');
+      expect(AppRoutes.profile, '/profile');
+      expect(AppRoutes.riderProfile, '/rider/profile');
+      expect(AppRoutes.driverProfile, '/driver/profile');
       expect(AppRoutes.dispatcherHome, '/dispatcher/home');
     });
   });
@@ -168,7 +172,44 @@ void main() {
       expect(find.byType(ErrorView), findsOneWidget);
       expect(find.text('Page Not Found'), findsAtLeastNWidgets(1));
     });
+
+    testWidgets('unauthenticated access to profile redirects to LoginScreen', (tester) async {
+      final unauthController = AuthController(initialState: const AuthState.unauthenticated());
+      await tester.pumpWidget(buildTestApp(AppRoutes.profile, authController: unauthController));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(ProfileScreen), findsNothing);
+    });
+
+    testWidgets('authenticated rider accessing profile routes to ProfileScreen', (tester) async {
+      final riderController = AuthController(initialState: AuthState.authenticated(dummyRider));
+      await tester.pumpWidget(buildTestApp(AppRoutes.profile, authController: riderController));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+
+    testWidgets('authenticated driver accessing profile routes to ProfileScreen', (tester) async {
+      final driverController = AuthController(initialState: AuthState.authenticated(dummyDriver));
+      await tester.pumpWidget(buildTestApp(AppRoutes.profile, authController: driverController));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+
+    testWidgets('driver accessing riderProfile redirects with cross-role protection', (tester) async {
+      final driverController = AuthController(initialState: AuthState.authenticated(dummyDriver));
+      await tester.pumpWidget(buildTestApp(AppRoutes.riderProfile, authController: driverController));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+
+    testWidgets('rider accessing driverProfile redirects with cross-role protection', (tester) async {
+      final riderController = AuthController(initialState: AuthState.authenticated(dummyRider));
+      await tester.pumpWidget(buildTestApp(AppRoutes.driverProfile, authController: riderController));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
   });
+
 
   group('AppNavigator Helpers', () {
     Widget buildNavApp(String initialRoute) {
@@ -312,5 +353,49 @@ void main() {
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.byType(DriverHomeScreen), findsNothing);
     });
+
+    testWidgets('toProfile pushes ProfileScreen onto navigator stack', (tester) async {
+      final riderController = AuthController.instance;
+      riderController.updateState(AuthState.authenticated(dummyRider));
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.riderHome));
+      await tester.pumpAndSettle();
+
+      final BuildContext context = tester.element(find.byType(RiderHomeScreen));
+      AppNavigator.toProfile(context);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+      expect(AppNavigator.canPop(tester.element(find.byType(ProfileScreen))), isTrue);
+    });
+
+    testWidgets('toRiderProfile pushes ProfileScreen for rider', (tester) async {
+      final riderController = AuthController.instance;
+      riderController.updateState(AuthState.authenticated(dummyRider));
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.riderHome));
+      await tester.pumpAndSettle();
+
+      final BuildContext context = tester.element(find.byType(RiderHomeScreen));
+      AppNavigator.toRiderProfile(context);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+
+    testWidgets('toDriverProfile pushes ProfileScreen for driver', (tester) async {
+      final driverController = AuthController.instance;
+      driverController.updateState(AuthState.authenticated(dummyDriver));
+
+      await tester.pumpWidget(buildNavApp(AppRoutes.driverHome));
+      await tester.pumpAndSettle();
+
+      final BuildContext context = tester.element(find.byType(DriverHomeScreen));
+      AppNavigator.toDriverProfile(context);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
   });
 }
+

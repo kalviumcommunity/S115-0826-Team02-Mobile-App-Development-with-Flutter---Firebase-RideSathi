@@ -76,4 +76,25 @@ void main() {
       expect(Validators.phone('+919876543210'), isNull);
     });
   });
+
+  group('Validators.vehicleInfo', () {
+    test('rejects an empty vehicle info', () {
+      expect(Validators.vehicleInfo(''), isNotNull);
+      expect(Validators.vehicleInfo(null), isNotNull);
+    });
+
+    test('rejects whitespace-only vehicle info', () {
+      expect(Validators.vehicleInfo('   '), isNotNull);
+    });
+
+    test('rejects vehicle info shorter than 2 characters', () {
+      expect(Validators.vehicleInfo('A'), isNotNull);
+    });
+
+    test('accepts valid vehicle info', () {
+      expect(Validators.vehicleInfo('Auto DL-01-AB-1234'), isNull);
+      expect(Validators.vehicleInfo('Bike PB 02 5678'), isNull);
+    });
+  });
 }
+

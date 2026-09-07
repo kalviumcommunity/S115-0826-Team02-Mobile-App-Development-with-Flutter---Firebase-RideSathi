@@ -52,8 +52,35 @@ class AuthController extends ChangeNotifier {
   /// The current authenticated user model, if any.
   UserModel? get currentUser => _state.user;
 
+  /// Underlying user profile persistence service.
+  UserProfileService get userProfileService => _userProfileService;
+
+  /// Current generation of the authentication session.
+  int get sessionGeneration => _sessionGeneration;
+
   /// The current error message, if any.
   String? get errorMessage => _state.errorMessage;
+
+  /// Updates the current authenticated user model in-place.
+  ///
+  /// Safe against race conditions and stale session invalidation:
+  /// - Rejects update if controller is disposed.
+  /// - Rejects update if [expectedGeneration] is provided and doesn't match [_sessionGeneration].
+  /// - Rejects update if user is not currently authenticated or UID doesn't match [updatedUser.id].
+  ///
+  /// Returns `true` if state was updated, `false` otherwise.
+  bool updateCurrentUser(UserModel updatedUser, {int? expectedGeneration}) {
+    if (_isDisposed) return false;
+    if (expectedGeneration != null && _sessionGeneration != expectedGeneration) {
+      return false;
+    }
+    if (!_state.isAuthenticated || _state.user?.id != updatedUser.id) {
+      return false;
+    }
+
+    _setState(AuthState.authenticated(updatedUser));
+    return true;
+  }
 
   void _setState(AuthState newState) {
     if (_isDisposed) return;

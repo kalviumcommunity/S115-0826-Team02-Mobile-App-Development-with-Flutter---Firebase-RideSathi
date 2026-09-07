@@ -93,4 +93,87 @@ class UserProfileService {
       throw FirestoreException.from(e);
     }
   }
+
+  /// Allowed mutable field keys for user profile updates.
+  static const Set<String> allowedUpdateKeys = {
+    'name',
+    'phoneNumber',
+    'vehicleInfo',
+  };
+
+  /// Disallowed immutable and domain-protected field keys.
+  static const Set<String> protectedKeys = {
+    'id',
+    'email',
+    'role',
+    'isUnionVerified',
+    'createdAt',
+  };
+
+  /// Updates permitted fields of an existing user profile document in Firestore at `users/{uid}`.
+  ///
+  /// Only [allowedUpdateKeys] are accepted. Attempting to modify [protectedKeys]
+  /// or unwhitelisted keys throws an [ArgumentError].
+  ///
+  /// Automatically injects [FieldValue.serverTimestamp()] for `updatedAt`.
+  ///
+  /// Returns the freshly fetched [UserModel] representing the updated state.
+  /// Throws [ArgumentError] for invalid parameters.
+  /// Throws [FirestoreException] if the write fails or the user document is not found.
+  Future<UserModel> updateProfile({
+    required String uid,
+    required Map<String, dynamic> updates,
+  }) async {
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) {
+      throw ArgumentError('UID cannot be empty.');
+    }
+    if (updates.isEmpty) {
+      throw ArgumentError('Updates map cannot be empty.');
+    }
+
+    for (final key in updates.keys) {
+      if (protectedKeys.contains(key)) {
+        throw ArgumentError('Cannot update immutable or protected field "$key".');
+      }
+      if (!allowedUpdateKeys.contains(key)) {
+        throw ArgumentError('Field "$key" is not permitted for profile update.');
+      }
+    }
+
+    try {
+      final payload = Map<String, dynamic>.from(updates);
+      payload['updatedAt'] = FieldValue.serverTimestamp();
+
+      await _usersCollection.doc(trimmedUid).update(payload);
+
+      final updatedProfile = await getUserProfile(trimmedUid);
+      if (updatedProfile == null) {
+        throw const FirestoreException(
+          'User profile not found after update.',
+          code: 'not-found',
+        );
+      }
+      return updatedProfile;
+    } catch (e) {
+      if (e is ArgumentError || e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
+
+  /// Convenience wrapper to update individual permitted profile fields.
+  Future<UserModel> updateProfileFields({
+    required String uid,
+    String? name,
+    String? phoneNumber,
+    String? vehicleInfo,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (phoneNumber != null) updates['phoneNumber'] = phoneNumber;
+    if (vehicleInfo != null) updates['vehicleInfo'] = vehicleInfo;
+
+    return updateProfile(uid: uid, updates: updates);
+  }
 }
+
