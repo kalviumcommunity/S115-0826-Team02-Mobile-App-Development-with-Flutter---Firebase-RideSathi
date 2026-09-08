@@ -205,7 +205,7 @@ void main() {
       expect(fakeProfile.savedProfile!.role, equals(UserRole.rider));
       // Navigates to rider home screen
       expect(find.text('RideSathi Rider'), findsOneWidget);
-      expect(find.text('Welcome, Deepak Verma'), findsOneWidget);
+      expect(find.text('Hello, Deepak Verma'), findsOneWidget);
     });
   });
 

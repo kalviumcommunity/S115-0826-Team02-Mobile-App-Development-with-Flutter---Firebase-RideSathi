@@ -166,7 +166,7 @@ void main() {
       expect(customController.isAuthenticated, isTrue);
       expect(customController.currentUser!.name, equals('Rider Ramesh'));
       expect(find.text('RideSathi Rider'), findsOneWidget);
-      expect(find.text('Welcome, Rider Ramesh'), findsOneWidget);
+      expect(find.text('Hello, Rider Ramesh'), findsOneWidget);
     });
 
     testWidgets('submits driver credentials, resolves driver profile, and navigates to home',
