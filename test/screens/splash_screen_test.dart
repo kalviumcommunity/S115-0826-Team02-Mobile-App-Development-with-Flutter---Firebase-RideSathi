@@ -309,7 +309,7 @@ void main() {
 
       expect(find.byType(SplashScreen), findsNothing);
       expect(find.text('RideSathi Rider'), findsOneWidget);
-      expect(find.text('Welcome, Splash Rider'), findsOneWidget);
+      expect(find.text('Hello, Splash Rider'), findsOneWidget);
     });
 
     testWidgets('navigates to /driver/home when driver user is authenticated with valid profile',

@@ -8,6 +8,7 @@ import '../../screens/driver/driver_home_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
+import '../../screens/rider/ride_request_placeholder_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
 
@@ -33,6 +34,9 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String riderProfile = '/rider/profile';
   static const String driverProfile = '/driver/profile';
+
+  // Rider Ride-Request Workflow (placeholder boundary for upcoming PRs)
+  static const String riderRequestRide = '/rider/request-ride';
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
@@ -210,6 +214,28 @@ class AppRoutes {
           settings: settings,
         );
 
+      case riderRequestRide:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.driver) {
+          // Cross-role protection: Driver attempting Rider request area
+          return MaterialPageRoute(
+            builder: (_) => DriverHomeScreen(
+              authController: controller,
+              user: userFromArgs,
+            ),
+            settings: settings,
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => const RideRequestPlaceholderScreen(),
+          settings: settings,
+        );
+
       case dispatcherHome:
         return _buildAccessErrorRoute(
           settings,
@@ -375,6 +401,14 @@ class AppNavigator {
   /// Navigates to the Driver Profile screen.
   static Future<void> toDriverProfile(BuildContext context) {
     return pushNamed(context, AppRoutes.driverProfile);
+  }
+
+  /// Navigates to the Rider ride-request placeholder screen.
+  ///
+  /// This is the entry point for the upcoming ride-request workflow.
+  /// The actual ride creation is out of scope for PR 19.
+  static Future<void> toRiderRequestRide(BuildContext context) {
+    return pushNamed(context, AppRoutes.riderRequestRide);
   }
 
   /// Logs out and resets the navigation stack to the Login screen.

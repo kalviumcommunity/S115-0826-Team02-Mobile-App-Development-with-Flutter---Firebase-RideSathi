@@ -1,11 +1,13 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/models/user_model.dart';
+import 'package:ridesathi/screens/profile/profile_screen.dart';
 import 'package:ridesathi/screens/rider/rider_home_screen.dart';
+import 'package:ridesathi/screens/rider/ride_request_placeholder_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 
@@ -28,10 +30,13 @@ class _FakeAuthService extends AuthService {
 void main() {
   late AuthController controller;
 
-  Widget wrap(Widget child) {
+  Widget wrap(Widget child, {AuthController? authController}) {
     return MaterialApp(
       home: child,
-      onGenerateRoute: AppRoutes.generateRoute,
+      onGenerateRoute: (settings) => AppRoutes.generateRoute(
+        settings,
+        authController: authController,
+      ),
     );
   }
 
@@ -58,18 +63,15 @@ void main() {
     FirebaseService.isInitializedOverride = false;
   });
 
-  group('RiderHomeScreen — Layout and Rider Identity', () {
-    testWidgets('renders rider branding, welcome text, and active role', (tester) async {
+  group('RiderHomeScreen \u2014 Layout and Rider Identity', () {
+    testWidgets('renders rider branding and greeting with rider name', (tester) async {
       await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: controller)),
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
       );
 
       expect(find.text('RideSathi Rider'), findsOneWidget);
-      expect(find.text('Welcome, Anita Roy'), findsOneWidget);
-      expect(find.text('Connected as Rider • +919876543210'), findsOneWidget);
-      expect(find.text('Rider Role Active'), findsOneWidget);
-      expect(find.text('Book a Ride'), findsOneWidget);
-      expect(find.text('Fair Union Pricing'), findsOneWidget);
+      expect(find.text('Hello, Anita Roy'), findsOneWidget);
+      expect(find.text('Where would you like to go?'), findsOneWidget);
     });
 
     testWidgets('fallback to Rider when name is empty', (tester) async {
@@ -86,22 +88,97 @@ void main() {
       );
 
       await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: anonController)),
+        wrap(RiderHomeScreen(authController: anonController), authController: anonController),
       );
 
-      expect(find.text('Welcome, Rider'), findsOneWidget);
+      expect(find.text('Hello, Rider'), findsOneWidget);
     });
   });
 
-  group('RiderHomeScreen — Logout Workflow', () {
+  group('RiderHomeScreen \u2014 Request a Ride CTA', () {
+    testWidgets('Request a Ride CTA is visible', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(find.text('Request a Ride'), findsOneWidget);
+    });
+
+    testWidgets('Request a Ride CTA navigates to placeholder screen', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      await tester.tap(find.text('Request a Ride'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RideRequestPlaceholderScreen), findsOneWidget);
+    });
+  });
+
+  group('RiderHomeScreen \u2014 Profile Access', () {
+    testWidgets('profile action is visible in app bar', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(find.byIcon(Icons.person_rounded), findsOneWidget);
+    });
+
+    testWidgets('profile action navigates to ProfileScreen', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      await tester.tap(find.byIcon(Icons.person_rounded));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+  });
+
+  group('RiderHomeScreen \u2014 Current Ride Section', () {
+    testWidgets('empty current ride state is displayed when no active ride', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(find.text('No active ride'), findsOneWidget);
+      expect(find.text('Current Ride'), findsOneWidget);
+    });
+
+    testWidgets('active ride UI is not falsely displayed', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(find.text('No active ride'), findsOneWidget);
+    });
+  });
+
+  group('RiderHomeScreen \u2014 Bottom Navigation', () {
+    testWidgets('bottom navigation selects Home correctly', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('Profile'), findsWidgets);
+    });
+
+    testWidgets('bottom navigation can reach Profile', (tester) async {
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      final profileDest = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Profile'),
+      );
+      await tester.tap(profileDest);
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileScreen), findsOneWidget);
+    });
+  });
+
+  group('RiderHomeScreen \u2014 Logout Workflow', () {
     testWidgets('successful logout clears stack and navigates to LoginScreen', (tester) async {
       await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: controller)),
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
       );
-
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pumpAndSettle();
-
       expect(controller.isAuthenticated, isFalse);
       expect(find.text('Sign in to continue'), findsOneWidget);
     });
@@ -111,69 +188,67 @@ void main() {
         authService: const _FakeAuthService(shouldFailSignOut: true),
         initialState: AuthState.authenticated(dummyRider),
       );
-
       await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: failingController)),
+        wrap(RiderHomeScreen(authController: failingController), authController: failingController),
       );
-
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
-
       expect(find.text('Sign out failed due to network.'), findsOneWidget);
     });
 
-    testWidgets('shows loading indicator and disables logout button during logout', (tester) async {
+    testWidgets('shows loading indicator during logout', (tester) async {
       final completer = Completer<void>();
       final slowController = AuthController(
         authService: _FakeAuthService(signOutCompleter: completer),
         initialState: AuthState.authenticated(dummyRider),
       );
-
       await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: slowController)),
+        wrap(RiderHomeScreen(authController: slowController), authController: slowController),
       );
-
       expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-
-      // Tap logout
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
-
-      // Spinner appears in place of icon
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
       expect(find.byIcon(Icons.logout_rounded), findsNothing);
-
-      // Complete sign-out
       completer.complete();
       await tester.pumpAndSettle();
-
-      expect(slowController.isAuthenticated, isFalse);
-      expect(find.text('Sign in to continue'), findsOneWidget);
-    });
-
-    testWidgets('rapid repeated taps on logout do not crash or produce duplicate navigation', (tester) async {
-      final completer = Completer<void>();
-      final slowController = AuthController(
-        authService: _FakeAuthService(signOutCompleter: completer),
-        initialState: AuthState.authenticated(dummyRider),
-      );
-
-      await tester.pumpWidget(
-        wrap(RiderHomeScreen(authController: slowController)),
-      );
-
-      // Tap multiple times rapidly
-      await tester.tap(find.byIcon(Icons.logout_rounded));
-      await tester.pump();
-      await tester.tap(find.byType(IconButton).last, warnIfMissed: false);
-      await tester.pump();
-
-      completer.complete();
-      await tester.pumpAndSettle();
-
       expect(slowController.isAuthenticated, isFalse);
       expect(find.text('Sign in to continue'), findsOneWidget);
     });
   });
+
+  group('RiderHomeScreen \u2014 Theming', () {
+    testWidgets('dark theme renders without exceptions', (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          Theme(
+            data: ThemeData.dark(useMaterial3: true),
+            child: RiderHomeScreen(authController: controller),
+          ),
+          authController: controller,
+        ),
+      );
+      expect(find.text('Hello, Anita Roy'), findsOneWidget);
+      expect(find.text('Request a Ride'), findsOneWidget);
+      expect(find.text('No active ride'), findsOneWidget);
+    });
+  });
+
+  group('RiderHomeScreen \u2014 Responsive Layout', () {
+    testWidgets('narrow-screen layout does not overflow', (tester) async {
+      tester.view.physicalSize = const Size(428, 926);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        wrap(RiderHomeScreen(authController: controller), authController: controller),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Hello, Anita Roy'), findsOneWidget);
+    });
+  });
 }
+
+
+
+

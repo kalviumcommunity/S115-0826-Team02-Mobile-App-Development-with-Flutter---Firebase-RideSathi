@@ -1,16 +1,24 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/widgets/info_card.dart';
-import 'package:ridesathi/widgets/union_badge.dart';
+import 'package:ridesathi/widgets/custom_button.dart';
+import 'package:ridesathi/widgets/empty_state_view.dart';
+import 'package:ridesathi/widgets/section_header.dart';
 
 /// Landing and dashboard screen for authenticated Riders in RideSathi.
 ///
-/// Displays rider identity, module status, and supports clean logout
-/// with navigation stack clearing.
+/// PR 19 establishes the rider home shell with:
+/// - Rider greeting using the authenticated domain profile
+/// - Primary "Request a Ride" call-to-action
+/// - Current ride / activity section with empty state
+/// - Profile access from the app bar and bottom navigation
+/// - Bottom navigation with Home and Profile destinations
+///
+/// This screen does NOT create rides, write to Firestore, or access ride
+/// data directly. Those responsibilities belong to later PRs.
 class RiderHomeScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
@@ -64,10 +72,17 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     }
   }
 
+  void _handleRequestRide() {
+    AppNavigator.toRiderRequestRide(context);
+  }
+
+  void _handleProfile() {
+    AppNavigator.toProfile(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final user = _currentUser;
     final riderName = user?.name.isNotEmpty == true ? user!.name : 'Rider';
 
@@ -99,167 +114,102 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
           ValueListenableBuilder<ThemeMode>(
             valueListenable: ThemeController.themeModeNotifier,
             builder: (context, mode, _) {
+              final isDark = theme.brightness == Brightness.dark;
               return IconButton(
                 icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  isDark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded,
                 ),
-                tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                onPressed: () => ThemeController.toggleTheme(),
+                tooltip: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+                onPressed: ThemeController.toggleTheme,
               );
             },
           ),
           IconButton(
-            icon: const Icon(Icons.person_outline_rounded),
+            icon: const Icon(Icons.person_rounded),
             tooltip: 'Profile',
-            onPressed: () => AppNavigator.toProfile(context),
+            onPressed: _handleProfile,
           ),
           IconButton(
             icon: _isLoggingOut
-                ? SizedBox(
+                ? const SizedBox(
                     height: 20,
                     width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.onSurface,
-                      ),
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
                   )
                 : const Icon(Icons.logout_rounded),
-            tooltip: 'Log Out',
+            tooltip: 'Sign Out',
             onPressed: _isLoggingOut ? null : _handleLogout,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppConstants.spaceXL,
-          vertical: AppConstants.spaceL,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Rider Welcome Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppConstants.spaceXL),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [AppConstants.accentNavy, const Color(0xFF334155)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppConstants.spaceXL),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Hello, $riderName',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                borderRadius: BorderRadius.circular(AppConstants.radiusPill),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const UnionBadge(),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Welcome, $riderName',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    user?.phoneNumber.isNotEmpty == true
-                        ? 'Connected as Rider • ${user!.phoneNumber}'
-                        : 'Book verified union cabs and auto-rickshaws.',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFFCBD5E1),
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spaceL),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppConstants.spaceM,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppConstants.secondaryTeal.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
-                      border: Border.all(
-                        color: AppConstants.secondaryTeal.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.person_pin_circle_rounded,
-                          size: 16,
-                          color: AppConstants.secondaryTeal,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Rider Role Active',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const SizedBox(height: AppConstants.spaceXS),
+              Text(
+                "Where would you like to go?",
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: AppConstants.spaceXL),
-
-            // Rider Quick Access / Status Section
-            Text(
-              'Rider Features',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppConstants.spaceM),
-
-            InfoCard(
-              title: 'Book a Ride',
-              description:
-                  'Instant union cab and auto-rickshaw hailing across regional hubs.',
-              icon: Icons.directions_car_rounded,
-              iconColor: AppConstants.secondaryTeal,
-              badgeText: 'PR 19 Upcoming',
-              badgeColor: AppConstants.secondaryTeal,
-            ),
-
-            InfoCard(
-              title: 'Fair Union Pricing',
-              description:
-                  'Standardized regional union meter tariffs with transparent billing.',
-              icon: Icons.currency_rupee_rounded,
-              iconColor: Colors.amber,
-              badgeText: 'Standardized',
-              badgeColor: Colors.green,
-            ),
-
-            InfoCard(
-              title: 'Verified Union Drivers',
-              description:
-                  'All drivers are union-registered and verified for passenger safety.',
-              icon: Icons.verified_user_rounded,
-              iconColor: Colors.blue,
-              badgeText: 'Protected',
-              badgeColor: Colors.blue,
-            ),
-          ],
+              const SizedBox(height: AppConstants.spaceXL),
+              Semantics(
+                label: 'Request a Ride',
+                button: true,
+                child: CustomButton(
+                  label: 'Request a Ride',
+                  icon: Icons.directions_car_rounded,
+                  onPressed: _handleRequestRide,
+                ),
+              ),
+              const SizedBox(height: AppConstants.spaceXXL),
+              const SectionHeader(title: 'Current Ride'),
+              const SizedBox(height: AppConstants.spaceM),
+              const EmptyStateView(
+                icon: Icons.local_taxi_rounded,
+                title: 'No active ride',
+                description:
+                    "You don't have an active ride right now. Request a ride "
+                    "when you're ready to travel.",
+              ),
+            ],
+          ),
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        onDestinationSelected: (index) {
+          if (index == 1) {
+            _handleProfile();
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }
 }
+
+
+
