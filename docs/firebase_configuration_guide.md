@@ -257,3 +257,32 @@ AppNavigator.logout(context) -> pushNamedAndRemoveUntil(login, false)
 6. **Disposal Lifecycle Guards**: `AuthController.dispose()` sets `_isDisposed = true`, increments `_sessionGeneration`, and cancels the auth stream subscription, preventing post-disposal `notifyListeners()`.
 7. **Known Limitation**: Client-side session teardown and route protection enforce local UI boundaries but do not replace server-enforced Cloud Firestore Security Rules (scheduled for PR 55/56).
 
+---
+
+## 12. Authenticated Profile Management & Mutation Contract (PR 18)
+
+### Profile Schema & Field Mutability Matrix
+Under Cloud Firestore `users/{uid}`, user profiles enforce strict boundary separation between mutable user details and immutable identity/domain permissions:
+
+| Field | Type | Mutability | Validated In | Rule / Constraint |
+| :--- | :--- | :---: | :---: | :--- |
+| `id` | `String` | **Immutable** | Auth / Core | Firebase Auth UID. Must never be altered. |
+| `email` | `String?` | **Immutable** | Auth / Core | Bound to Firebase Auth credential. Read-only in profile. |
+| `role` | `String` | **Immutable** | Auth / Core | Role hierarchy (`rider` \| `driver`). Client role escalation forbidden. |
+| `isUnionVerified`| `bool` | **Immutable** | Union Admin | Union membership verification. Managed exclusively by admin dispatchers. |
+| `createdAt` | `Timestamp`| **Immutable** | Service | Fixed creation server timestamp. |
+| `name` | `String` | **Mutable** | UI / Service | Full Name: Required, 2–100 characters. |
+| `phoneNumber` | `String` | **Mutable** | UI / Service | Phone Number: Required, 7–15 digits, optional `+` prefix. |
+| `vehicleInfo` | `String?` | **Mutable (Drivers)** | UI / Service | Required for Drivers (min 2 chars). Rejected/Ignored for Riders. |
+| `updatedAt` | `Timestamp`| **Auto-injected** | Service | Automatically overwritten with `FieldValue.serverTimestamp()` on every update. |
+
+### Partial Update vs Overwrite Pattern
+- Profile modifications MUST use Firestore document update (`_usersCollection.doc(uid).update(payload)`) rather than document `set`.
+- This ensures concurrent fields outside the client's current scope are preserved and prevents accidental clobbering of unread server attributes.
+- Whitelisting is enforced at the service level (`UserProfileService.allowedUpdateKeys`): attempt to submit keys outside `name`, `phoneNumber`, and `vehicleInfo` throws an `ArgumentError`.
+
+### Asynchronous Session Teardown & Race Condition Guards
+- `ProfileController` tracks `AuthController.sessionGeneration` upon initiating `saveProfile()`.
+- If a user signs out or the session generation changes while a profile update network write is in flight, the completed write is discarded client-side and will **never resurrect** the unauthenticated session.
+- Once saved successfully, `AuthController.updateCurrentUser(updatedUser, expectedGeneration: sessionGen)` updates the in-memory user instance without re-authenticating or triggering full page tears.
+

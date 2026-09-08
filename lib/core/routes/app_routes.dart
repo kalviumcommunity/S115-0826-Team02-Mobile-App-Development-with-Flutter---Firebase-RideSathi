@@ -6,6 +6,7 @@ import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
 import '../../screens/driver/driver_home_screen.dart';
 import '../../screens/home_screen.dart';
+import '../../screens/profile/profile_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
@@ -27,6 +28,11 @@ class AppRoutes {
   // Role-Specific Authenticated Routes
   static const String riderHome = '/rider/home';
   static const String driverHome = '/driver/home';
+
+  // Authenticated Profile Routes
+  static const String profile = '/profile';
+  static const String riderProfile = '/rider/profile';
+  static const String driverProfile = '/driver/profile';
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
@@ -154,11 +160,62 @@ class AppRoutes {
           settings: settings,
         );
 
+      case profile:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => ProfileScreen(authController: controller),
+          settings: settings,
+        );
+
+      case riderProfile:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.driver) {
+          // Cross-role protection: Driver attempting Rider profile area
+          return MaterialPageRoute(
+            builder: (_) => ProfileScreen(authController: controller),
+            settings: const RouteSettings(name: driverProfile),
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => ProfileScreen(authController: controller),
+          settings: settings,
+        );
+
+      case driverProfile:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.rider) {
+          // Cross-role protection: Rider attempting Driver profile area
+          return MaterialPageRoute(
+            builder: (_) => ProfileScreen(authController: controller),
+            settings: const RouteSettings(name: riderProfile),
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => ProfileScreen(authController: controller),
+          settings: settings,
+        );
+
       case dispatcherHome:
         return _buildAccessErrorRoute(
           settings,
           'Dispatcher console is reserved for upcoming roadmap milestones.',
         );
+
 
       default:
         return MaterialPageRoute(
@@ -303,6 +360,21 @@ class AppNavigator {
   /// Navigates from Login to Driver Signup (or pushes Driver Signup).
   static Future<void> toDriverSignup(BuildContext context) {
     return pushReplacementNamed(context, AppRoutes.driverSignup);
+  }
+
+  /// Navigates to the user's Profile screen.
+  static Future<void> toProfile(BuildContext context) {
+    return pushNamed(context, AppRoutes.profile);
+  }
+
+  /// Navigates to the Rider Profile screen.
+  static Future<void> toRiderProfile(BuildContext context) {
+    return pushNamed(context, AppRoutes.riderProfile);
+  }
+
+  /// Navigates to the Driver Profile screen.
+  static Future<void> toDriverProfile(BuildContext context) {
+    return pushNamed(context, AppRoutes.driverProfile);
   }
 
   /// Logs out and resets the navigation stack to the Login screen.

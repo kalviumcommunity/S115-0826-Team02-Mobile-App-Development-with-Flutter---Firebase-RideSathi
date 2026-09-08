@@ -61,6 +61,53 @@ class FakeUserProfileService extends UserProfileService {
     }
   }
 
+  @override
+  Future<UserModel> updateProfile({
+    required String uid,
+    required Map<String, dynamic> updates,
+  }) async {
+    if (shouldThrow) {
+      throw exceptionToThrow ??
+          const FirestoreException(
+            'Service is temporarily unavailable. Please try again later.',
+            code: 'unavailable',
+          );
+    }
+    final trimmedUid = uid.trim();
+    if (trimmedUid.isEmpty) {
+      throw ArgumentError('UID cannot be empty.');
+    }
+    if (updates.isEmpty) {
+      throw ArgumentError('Updates map cannot be empty.');
+    }
+
+    for (final key in updates.keys) {
+      if (UserProfileService.protectedKeys.contains(key)) {
+        throw ArgumentError('Cannot update immutable or protected field "$key".');
+      }
+      if (!UserProfileService.allowedUpdateKeys.contains(key)) {
+        throw ArgumentError('Field "$key" is not permitted for profile update.');
+      }
+    }
+
+    final existing = _storage[trimmedUid];
+    if (existing == null) {
+      throw const FirestoreException(
+        'User profile not found after update.',
+        code: 'not-found',
+      );
+    }
+
+    final updated = Map<String, dynamic>.from(existing);
+    for (final entry in updates.entries) {
+      updated[entry.key] = entry.value;
+    }
+    updated['updatedAt'] = DateTime.now().toIso8601String();
+    _storage[trimmedUid] = updated;
+
+    return UserModel.fromMap(updated);
+  }
+
   void setRawData(String uid, Map<String, dynamic> data) {
     _storage[uid] = data;
   }
@@ -68,6 +115,7 @@ class FakeUserProfileService extends UserProfileService {
   bool hasProfile(String uid) => _storage.containsKey(uid);
   Map<String, dynamic>? getRawData(String uid) => _storage[uid];
 }
+
 
 void main() {
   group('UserProfileService — Contract & In-Memory Verification', () {
@@ -206,5 +254,191 @@ void main() {
         )),
       );
     });
+
+    group('updateProfile', () {
+      setUp(() async {
+        await profileService.createRiderProfile(UserModel(
+          id: 'rider-up-1',
+          name: 'Original Rider',
+          phoneNumber: '+911111111111',
+          email: 'rider1@ridesathi.com',
+          role: UserRole.rider,
+          createdAt: DateTime.now(),
+        ));
+
+        await profileService.createDriverProfile(UserModel(
+          id: 'driver-up-1',
+          name: 'Original Driver',
+          phoneNumber: '+912222222222',
+          email: 'driver1@ridesathi.com',
+          role: UserRole.driver,
+          vehicleInfo: 'Auto DL-01-AB-1234',
+          createdAt: DateTime.now(),
+        ));
+      });
+
+      test('updates permitted mutable fields (name, phone) on rider profile', () async {
+        final updated = await profileService.updateProfile(
+          uid: 'rider-up-1',
+          updates: {
+            'name': 'Updated Rider',
+            'phoneNumber': '+919999988888',
+          },
+        );
+
+        expect(updated.name, equals('Updated Rider'));
+        expect(updated.phoneNumber, equals('+919999988888'));
+        expect(updated.email, equals('rider1@ridesathi.com'));
+        expect(updated.role, equals(UserRole.rider));
+      });
+
+      test('updates vehicleInfo on driver profile', () async {
+        final updated = await profileService.updateProfile(
+          uid: 'driver-up-1',
+          updates: {
+            'vehicleInfo': 'Cab DL-04-XY-9999',
+          },
+        );
+
+        expect(updated.vehicleInfo, equals('Cab DL-04-XY-9999'));
+        expect(updated.name, equals('Original Driver'));
+        expect(updated.role, equals(UserRole.driver));
+      });
+
+      test('throws ArgumentError when uid is empty or whitespace', () async {
+        expect(
+          () => profileService.updateProfile(uid: '', updates: {'name': 'Test'}),
+          throwsArgumentError,
+        );
+        expect(
+          () => profileService.updateProfile(uid: '   ', updates: {'name': 'Test'}),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when updates map is empty', () async {
+        expect(
+          () => profileService.updateProfile(uid: 'rider-up-1', updates: {}),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update immutable field "id"', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'id': 'hacked-id'},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update immutable field "email"', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'email': 'hacked@ridesathi.com'},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update immutable field "role"', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'role': 'driver'},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update protected field "isUnionVerified"', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'driver-up-1',
+            updates: {'isUnionVerified': true},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update immutable field "createdAt"', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'createdAt': DateTime.now().toIso8601String()},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('throws ArgumentError when attempting to update unwhitelisted arbitrary fields', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'isAdmin': true},
+          ),
+          throwsArgumentError,
+        );
+      });
+
+      test('updates updatedAt timestamp on successful save', () async {
+        final before = DateTime.now().subtract(const Duration(seconds: 1));
+        final updated = await profileService.updateProfile(
+          uid: 'rider-up-1',
+          updates: {'name': 'New Name'},
+        );
+
+        expect(updated.updatedAt, isNotNull);
+        expect(updated.updatedAt!.isAfter(before), isTrue);
+      });
+
+      test('throws FirestoreException when document does not exist', () async {
+        expect(
+          () => profileService.updateProfile(
+            uid: 'non-existent-uid',
+            updates: {'name': 'Ghost'},
+          ),
+          throwsA(isA<FirestoreException>().having(
+            (e) => e.code,
+            'code',
+            equals('not-found'),
+          )),
+        );
+      });
+
+      test('throws FirestoreException on service failure', () async {
+        profileService.shouldThrow = true;
+        profileService.exceptionToThrow = const FirestoreException(
+          'Network unavailable',
+          code: 'unavailable',
+        );
+
+        expect(
+          () => profileService.updateProfile(
+            uid: 'rider-up-1',
+            updates: {'name': 'Network Fail'},
+          ),
+          throwsA(isA<FirestoreException>().having(
+            (e) => e.code,
+            'code',
+            equals('unavailable'),
+          )),
+        );
+      });
+
+      test('updateProfileFields convenience wrapper properly applies updates', () async {
+        final updated = await profileService.updateProfileFields(
+          uid: 'rider-up-1',
+          name: 'Convenience Name',
+          phoneNumber: '+918888877777',
+        );
+
+        expect(updated.name, equals('Convenience Name'));
+        expect(updated.phoneNumber, equals('+918888877777'));
+      });
+    });
   });
 }
+
