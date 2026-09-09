@@ -52,4 +52,24 @@ class LocationModel {
   int get hashCode {
     return Object.hash(id, displayName, address, latitude, longitude);
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'displayName': displayName,
+      'address': address,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+    };
+  }
+
+  factory LocationModel.fromMap(Map<String, dynamic> map) {
+    return LocationModel(
+      id: map['id'] as String? ?? '',
+      displayName: map['displayName'] as String? ?? '',
+      address: map['address'] as String? ?? '',
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+    );
+  }
 }

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/location_selection_controller.dart';
+import '../../core/state/ride_request_controller.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/error_view.dart';
+import '../../widgets/loading_view.dart';
 
-class RideReviewBoundaryScreen extends StatelessWidget {
+class RideReviewBoundaryScreen extends StatefulWidget {
   final LocationSelectionController controller;
 
   const RideReviewBoundaryScreen({
@@ -14,9 +17,49 @@ class RideReviewBoundaryScreen extends StatelessWidget {
   });
 
   @override
+  State<RideReviewBoundaryScreen> createState() => _RideReviewBoundaryScreenState();
+}
+
+class _RideReviewBoundaryScreenState extends State<RideReviewBoundaryScreen> {
+  late final RideRequestController _requestController;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestController = RideRequestController();
+    _requestController.addListener(_onRequestStateChange);
+  }
+
+  void _onRequestStateChange() {
+    final state = _requestController.state;
+    if (state.isSuccess) {
+      // Show success snackbar and navigate
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your ride request has been submitted.')),
+      );
+      // Clear draft
+      widget.controller.clear();
+      // Navigate to Rider Home
+      AppNavigator.pushNamedAndRemoveUntil(context, AppRoutes.riderHome);
+    } else if (state.isError && state.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(state.errorMessage!)),
+      );
+      _requestController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _requestController.removeListener(_onRequestStateChange);
+    _requestController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final draft = controller.draft;
+    final draft = widget.controller.draft;
 
     // Safety check in case navigated here directly without valid state
     if (!draft.isComplete) {
@@ -36,7 +79,7 @@ class RideReviewBoundaryScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SectionHeader(
+              const SectionHeader(
                 title: 'Review your ride details',
                 subtitle: 'Confirm your pickup and destination locations.',
               ),
@@ -67,35 +110,26 @@ class RideReviewBoundaryScreen extends StatelessWidget {
 
               const Spacer(),
 
-              // Placeholder message for PR 20
-              Container(
-                padding: const EdgeInsets.all(AppConstants.spaceM),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Ride creation and confirmation will be implemented in the next release. This is the boundary for PR 20.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: AppConstants.spaceL),
+              ListenableBuilder(
+                listenable: _requestController,
+                builder: (context, child) {
+                  final state = _requestController.state;
+                  
+                  if (state.isLoading) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppConstants.spaceM),
+                      child: LoadingView(message: 'Requesting ride...'),
+                    );
+                  }
 
-              // Final Continue Action (Mock)
-              CustomButton(
-                text: 'Confirm Ride (Coming Soon)',
-                onPressed: () {
-                  // Do nothing in PR 20 boundary
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Ride creation is out of scope for PR 20.'),
-                    ),
+                  return CustomButton(
+                    text: 'Request Ride',
+                    onPressed: () {
+                      _requestController.submitRequest(draft);
+                    },
+                    isLoading: false,
                   );
                 },
-                isLoading: false,
               ),
             ],
           ),
