@@ -7,10 +7,13 @@ import '../../screens/auth/signup_screen.dart';
 import '../../screens/driver/driver_home_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/profile/profile_screen.dart';
+import '../../screens/rider/location_search_screen.dart';
+import '../../screens/rider/location_selection_screen.dart';
+import '../../screens/rider/ride_review_boundary_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
-import '../../screens/rider/ride_request_placeholder_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
+import '../state/location_selection_controller.dart';
 
 /// Centralized route registry and generator for RideSathi.
 ///
@@ -35,8 +38,10 @@ class AppRoutes {
   static const String riderProfile = '/rider/profile';
   static const String driverProfile = '/driver/profile';
 
-  // Rider Ride-Request Workflow (placeholder boundary for upcoming PRs)
+  // Rider Ride-Request Workflow
   static const String riderRequestRide = '/rider/request-ride';
+  static const String riderLocationSearch = '/rider/location-search';
+  static const String riderReviewRide = '/rider/review-ride';
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
@@ -232,7 +237,36 @@ class AppRoutes {
           );
         }
         return MaterialPageRoute(
-          builder: (_) => const RideRequestPlaceholderScreen(),
+          builder: (_) => const LocationSelectionScreen(),
+          settings: settings,
+        );
+
+      case riderLocationSearch:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        final locationType = settings.arguments as String? ?? 'pickup';
+        return MaterialPageRoute(
+          builder: (_) => LocationSearchScreen(locationType: locationType),
+          settings: settings,
+        );
+
+      case riderReviewRide:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        final locController = settings.arguments as LocationSelectionController?;
+        if (locController == null) {
+          return _buildAccessErrorRoute(settings, 'Missing location selection state.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => RideReviewBoundaryScreen(controller: locController),
           settings: settings,
         );
 
@@ -403,10 +437,7 @@ class AppNavigator {
     return pushNamed(context, AppRoutes.driverProfile);
   }
 
-  /// Navigates to the Rider ride-request placeholder screen.
-  ///
-  /// This is the entry point for the upcoming ride-request workflow.
-  /// The actual ride creation is out of scope for PR 19.
+  /// Navigates to the Rider ride-request flow (starts location selection).
   static Future<void> toRiderRequestRide(BuildContext context) {
     return pushNamed(context, AppRoutes.riderRequestRide);
   }
