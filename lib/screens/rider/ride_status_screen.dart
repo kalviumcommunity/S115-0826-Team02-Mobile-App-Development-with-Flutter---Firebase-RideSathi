@@ -8,6 +8,7 @@ import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/driver_information_view.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -155,6 +156,9 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               ],
             ),
           ),
+          
+          const SizedBox(height: AppConstants.spaceL),
+          DriverInformationView(driverId: ride.driverId),
           
           const Spacer(),
           
