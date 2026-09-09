@@ -5,6 +5,7 @@ import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/widgets/info_card.dart';
+import 'package:ridesathi/widgets/location_sharing_status_banner.dart';
 import 'package:ridesathi/widgets/union_badge.dart';
 
 /// Landing and dashboard screen for authenticated Drivers in RideSathi.
@@ -256,6 +257,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ],
               ),
             ),
+            
+            // DEBUG: Minimal integration boundary for PR 24 manual testing
+            // This is provided so the team can manually test Firebase writes 
+            // without fabricating a full fake active-ride screen.
+            // Replace 'debug_ride_123' with an actual ride document ID from Firestore.
+            const SizedBox(height: AppConstants.spaceM),
+            const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
+            
             const SizedBox(height: AppConstants.spaceXL),
 
             // Registered Vehicle Details

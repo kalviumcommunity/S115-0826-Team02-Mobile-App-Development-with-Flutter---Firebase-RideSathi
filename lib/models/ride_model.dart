@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'driver_location.dart';
 import 'location_model.dart';
 
 /// Represents the status of a ride request.
@@ -24,6 +25,7 @@ class RideModel {
   final String id;
   final String riderId;
   final String? driverId;
+  final DriverLocation? driverLocation;
   final LocationModel pickup;
   final LocationModel destination;
   final VehicleType vehicleType;
@@ -36,6 +38,7 @@ class RideModel {
     required this.id,
     required this.riderId,
     this.driverId,
+    this.driverLocation,
     required this.pickup,
     required this.destination,
     required this.vehicleType,
@@ -50,6 +53,7 @@ class RideModel {
       'id': id,
       'riderId': riderId,
       'driverId': driverId,
+      if (driverLocation != null) 'driverLocation': driverLocation!.toMap(),
       'pickup': pickup.toMap(),
       'destination': destination.toMap(),
       'vehicleType': vehicleType.name,
@@ -68,6 +72,9 @@ class RideModel {
       id: idOverride ?? map['id'] as String? ?? '',
       riderId: map['riderId'] as String? ?? '',
       driverId: map['driverId'] as String?,
+      driverLocation: map['driverLocation'] != null
+          ? DriverLocation.fromMap(map['driverLocation'] as Map<String, dynamic>)
+          : null,
       pickup: LocationModel.fromMap(map['pickup'] as Map<String, dynamic>? ?? {}),
       destination: LocationModel.fromMap(map['destination'] as Map<String, dynamic>? ?? {}),
       vehicleType: VehicleType.values.firstWhere(
