@@ -39,8 +39,12 @@ class _RideReviewBoundaryScreenState extends State<RideReviewBoundaryScreen> {
       );
       // Clear draft
       widget.controller.clear();
-      // Navigate to Rider Home
-      AppNavigator.pushNamedAndRemoveUntil(context, AppRoutes.riderHome);
+      // Navigate to Ride Status
+      AppNavigator.pushNamedAndRemoveUntil(
+        context, 
+        AppRoutes.riderStatus,
+        arguments: state.data!.id,
+      );
     } else if (state.isError && state.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(state.errorMessage!)),

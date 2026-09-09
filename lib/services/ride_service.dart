@@ -44,4 +44,37 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
+
+  /// Observes a specific ride document in real-time.
+  /// 
+  /// Yields `null` if the document does not exist.
+  /// Throws a [FirestoreException] on stream failure.
+  Stream<RideModel?> watchRide(String rideId) {
+    if (rideId.trim().isEmpty) {
+      return Stream.error(const FirestoreException('Invalid ride ID.'));
+    }
+
+    try {
+      return _rides.doc(rideId).snapshots().map((snapshot) {
+        if (!snapshot.exists) {
+          return null;
+        }
+        
+        final data = snapshot.data();
+        if (data == null) {
+          return null;
+        }
+        
+        try {
+          return RideModel.fromMap(data, snapshot.id);
+        } catch (e) {
+          throw FirestoreException('Malformed ride data.');
+        }
+      }).handleError((error) {
+        throw FirestoreException.from(error);
+      });
+    } catch (e) {
+      return Stream.error(FirestoreException.from(e));
+    }
+  }
 }
