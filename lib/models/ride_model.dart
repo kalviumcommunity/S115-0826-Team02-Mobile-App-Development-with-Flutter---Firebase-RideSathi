@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'location_model.dart';
+
 /// Represents the status of a ride request.
 enum RideStatus {
   requested,
@@ -21,23 +24,25 @@ class RideModel {
   final String id;
   final String riderId;
   final String? driverId;
-  final String pickupAddress;
-  final String dropoffAddress;
+  final LocationModel pickup;
+  final LocationModel destination;
   final VehicleType vehicleType;
   final RideStatus status;
   final double estimatedFare;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   const RideModel({
     required this.id,
     required this.riderId,
     this.driverId,
-    required this.pickupAddress,
-    required this.dropoffAddress,
+    required this.pickup,
+    required this.destination,
     required this.vehicleType,
     required this.status,
     required this.estimatedFare,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -45,22 +50,26 @@ class RideModel {
       'id': id,
       'riderId': riderId,
       'driverId': driverId,
-      'pickupAddress': pickupAddress,
-      'dropoffAddress': dropoffAddress,
+      'pickup': pickup.toMap(),
+      'destination': destination.toMap(),
       'vehicleType': vehicleType.name,
       'status': status.name,
       'estimatedFare': estimatedFare,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
-  factory RideModel.fromMap(Map<String, dynamic> map) {
+  factory RideModel.fromMap(Map<String, dynamic> map, [String? idOverride]) {
+    final createVal = map['createdAt'];
+    final updateVal = map['updatedAt'];
+
     return RideModel(
-      id: map['id'] as String? ?? '',
+      id: idOverride ?? map['id'] as String? ?? '',
       riderId: map['riderId'] as String? ?? '',
       driverId: map['driverId'] as String?,
-      pickupAddress: map['pickupAddress'] as String? ?? '',
-      dropoffAddress: map['dropoffAddress'] as String? ?? '',
+      pickup: LocationModel.fromMap(map['pickup'] as Map<String, dynamic>? ?? {}),
+      destination: LocationModel.fromMap(map['destination'] as Map<String, dynamic>? ?? {}),
       vehicleType: VehicleType.values.firstWhere(
         (v) => v.name == map['vehicleType'],
         orElse: () => VehicleType.autoRickshaw,
@@ -70,9 +79,8 @@ class RideModel {
         orElse: () => RideStatus.requested,
       ),
       estimatedFare: (map['estimatedFare'] as num? ?? 0.0).toDouble(),
-      createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: createVal is Timestamp ? createVal.toDate() : DateTime.now(),
+      updatedAt: updateVal is Timestamp ? updateVal.toDate() : DateTime.now(),
     );
   }
 }
