@@ -3,9 +3,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/state/view_state.dart';
 import '../../models/location_model.dart';
 import '../../services/location_service.dart';
-import '../../widgets/error_view.dart';
-import '../../widgets/loading_view.dart';
-import '../../widgets/empty_state_view.dart';
+
 import '../../widgets/view_state_builder.dart';
 
 class LocationSearchScreen extends StatefulWidget {
@@ -120,16 +118,10 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
           initialBuilder: (context) => const Center(
             child: Text('Type to search for a location'),
           ),
-          loadingBuilder: (context, message) => LoadingView(message: message),
-          emptyBuilder: (context, message) => EmptyStateView(
-            message: message ?? 'No locations found',
-            icon: Icons.search_off_rounded,
-          ),
-          errorBuilder: (context, message, code, error) => ErrorView(
-            message: message,
-            onRetry: () => _performSearch(_searchController.text),
-          ),
-          successBuilder: (context, locations) {
+          emptyDescription: 'No locations found',
+          emptyIcon: Icons.search_off_rounded,
+          onRetry: () => _performSearch(_searchController.text),
+          builder: (context, locations) {
             return ListView.separated(
               itemCount: locations.length,
               separatorBuilder: (context, index) => const Divider(height: 1),

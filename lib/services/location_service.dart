@@ -59,7 +59,7 @@ class MockLocationService implements LocationService {
 
     // Special case to trigger a simulated error for testing
     if (normalizedQuery == 'error') {
-      throw ServiceException('mock_error', 'Simulated location provider error');
+      throw ServiceException('Simulated location provider error', code: 'mock_error');
     }
 
     final results = _mockDatabase.where((loc) {
