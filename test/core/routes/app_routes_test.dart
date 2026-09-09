@@ -12,7 +12,6 @@ import 'package:ridesathi/screens/auth/signup_screen.dart';
 import 'package:ridesathi/screens/driver/driver_home_screen.dart';
 import 'package:ridesathi/screens/profile/profile_screen.dart';
 import 'package:ridesathi/screens/rider/rider_home_screen.dart';
-import 'package:ridesathi/screens/rider/ride_request_placeholder_screen.dart';
 import 'package:ridesathi/screens/splash_screen.dart';
 import 'package:ridesathi/widgets/error_view.dart';
 
@@ -60,7 +59,6 @@ void main() {
       expect(AppRoutes.profile, '/profile');
       expect(AppRoutes.riderProfile, '/rider/profile');
       expect(AppRoutes.driverProfile, '/driver/profile');
-      expect(AppRoutes.riderRequestRide, '/rider/request-ride');
       expect(AppRoutes.dispatcherHome, '/dispatcher/home');
     });
   });
@@ -165,28 +163,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ErrorView), findsOneWidget);
       expect(find.text('Access Restricted'), findsAtLeastNWidgets(1));
-    });
-
-    testWidgets('authenticated rider gets RideRequestPlaceholderScreen on riderRequestRide', (tester) async {
-      final riderController = AuthController(initialState: AuthState.authenticated(dummyRider));
-      await tester.pumpWidget(buildTestApp(AppRoutes.riderRequestRide, authController: riderController));
-      await tester.pumpAndSettle();
-      expect(find.byType(RideRequestPlaceholderScreen), findsOneWidget);
-    });
-
-    testWidgets('unauthenticated access to riderRequestRide redirects to LoginScreen', (tester) async {
-      final unauthController = AuthController(initialState: const AuthState.unauthenticated());
-      await tester.pumpWidget(buildTestApp(AppRoutes.riderRequestRide, authController: unauthController));
-      await tester.pumpAndSettle();
-      expect(find.byType(LoginScreen), findsOneWidget);
-    });
-
-    testWidgets('cross-role protection: driver attempting riderRequestRide is redirected to DriverHomeScreen', (tester) async {
-      final driverController = AuthController(initialState: AuthState.authenticated(dummyDriver));
-      await tester.pumpWidget(buildTestApp(AppRoutes.riderRequestRide, authController: driverController));
-      await tester.pumpAndSettle();
-      expect(find.byType(DriverHomeScreen), findsOneWidget);
-      expect(find.byType(RideRequestPlaceholderScreen), findsNothing);
     });
 
     testWidgets('generates ErrorView for unknown routes', (tester) async {
@@ -421,19 +397,6 @@ void main() {
       expect(find.byType(ProfileScreen), findsOneWidget);
     });
 
-    testWidgets('toRiderRequestRide pushes RideRequestPlaceholderScreen for rider', (tester) async {
-      final riderController = AuthController.instance;
-      riderController.updateState(AuthState.authenticated(dummyRider));
-
-      await tester.pumpWidget(buildNavApp(AppRoutes.riderHome));
-      await tester.pumpAndSettle();
-
-      final BuildContext context = tester.element(find.byType(RiderHomeScreen));
-      AppNavigator.toRiderRequestRide(context);
-      await tester.pumpAndSettle();
-
-      expect(find.byType(RideRequestPlaceholderScreen), findsOneWidget);
-    });
   });
 }
 

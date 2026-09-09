@@ -82,7 +82,7 @@ class GeolocatorLocationProvider implements LocationProvider {
       return DriverLocation(
         latitude: position.latitude,
         longitude: position.longitude,
-        updatedAt: position.timestamp ?? DateTime.now(), // Fallback to now if null
+        updatedAt: position.timestamp,
       );
     });
   }
