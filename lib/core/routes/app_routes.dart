@@ -10,6 +10,7 @@ import '../../screens/profile/profile_screen.dart';
 import '../../screens/rider/location_search_screen.dart';
 import '../../screens/rider/location_selection_screen.dart';
 import '../../screens/rider/ride_review_boundary_screen.dart';
+import '../../screens/rider/ride_status_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
@@ -42,6 +43,7 @@ class AppRoutes {
   static const String riderRequestRide = '/rider/request-ride';
   static const String riderLocationSearch = '/rider/location-search';
   static const String riderReviewRide = '/rider/review-ride';
+  static const String riderStatus = '/rider/ride-status';
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
@@ -267,6 +269,22 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => RideReviewBoundaryScreen(controller: locController),
+          settings: settings,
+        );
+
+      case riderStatus:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        final rideId = settings.arguments as String?;
+        if (rideId == null || rideId.trim().isEmpty) {
+          return _buildAccessErrorRoute(settings, 'Missing ride ID.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => RideStatusScreen(rideId: rideId),
           settings: settings,
         );
 
