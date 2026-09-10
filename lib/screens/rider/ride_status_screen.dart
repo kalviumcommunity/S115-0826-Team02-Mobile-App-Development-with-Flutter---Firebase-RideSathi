@@ -8,6 +8,7 @@ import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/driver_information_view.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -54,13 +55,13 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
               return Padding(
                 padding: const EdgeInsets.all(AppConstants.spaceXL),
                 child: ErrorView(
-                  message: state.errorMessage ?? 'Failed to load ride.',
-                  onRetry: _statusController.retry,
-                  actionLabel: 'Return Home',
-                  onAction: () {
+                  message: state.message ?? 'Failed to load ride.',
+                  retryLabel: 'Return Home',
+                  onRetry: () {
                     AppNavigator.pushNamedAndRemoveUntil(
                       context,
                       AppRoutes.riderHome,
+                      (route) => false,
                     );
                   },
                 ),
@@ -143,10 +144,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                       ),
                     ),
                     StatusBadge(
-                      label: ride.status.name.toUpperCase(),
-                      // A proper theme or color mapping could be used, fallback to standard:
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      textColor: theme.colorScheme.onPrimaryContainer,
+                      status: ride.status.name.toUpperCase(),
                     ),
                   ],
                 ),
@@ -159,15 +157,18 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             ),
           ),
           
+          const SizedBox(height: AppConstants.spaceL),
+          DriverInformationView(driverId: ride.driverId),
+          
           const Spacer(),
           
           CustomButton(
-            text: 'Return to Home',
-            type: ButtonType.outlined,
+            label: 'Return Home',
             onPressed: () {
               AppNavigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.riderHome,
+                (route) => false,
               );
             },
           ),

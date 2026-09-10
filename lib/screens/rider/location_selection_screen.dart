@@ -119,7 +119,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 
               // Continue Button
               CustomButton(
-                text: 'Continue',
+                label: 'Continue',
                 onPressed: _onContinue,
                 isLoading: false,
               ),

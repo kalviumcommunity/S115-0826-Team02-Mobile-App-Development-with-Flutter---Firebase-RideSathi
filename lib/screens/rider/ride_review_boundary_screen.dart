@@ -5,7 +5,6 @@ import '../../core/state/location_selection_controller.dart';
 import '../../core/state/ride_request_controller.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 
 class RideReviewBoundaryScreen extends StatefulWidget {
@@ -43,11 +42,12 @@ class _RideReviewBoundaryScreenState extends State<RideReviewBoundaryScreen> {
       AppNavigator.pushNamedAndRemoveUntil(
         context, 
         AppRoutes.riderStatus,
+        (route) => false,
         arguments: state.data!.id,
       );
-    } else if (state.isError && state.errorMessage != null) {
+    } else if (state.isError && state.message != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.errorMessage!)),
+        SnackBar(content: Text(state.message!)),
       );
       _requestController.reset();
     }
@@ -62,7 +62,6 @@ class _RideReviewBoundaryScreenState extends State<RideReviewBoundaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final draft = widget.controller.draft;
 
     // Safety check in case navigated here directly without valid state
@@ -127,7 +126,7 @@ class _RideReviewBoundaryScreenState extends State<RideReviewBoundaryScreen> {
                   }
 
                   return CustomButton(
-                    text: 'Request Ride',
+                    label: 'Request Ride',
                     onPressed: () {
                       _requestController.submitRequest(draft);
                     },
