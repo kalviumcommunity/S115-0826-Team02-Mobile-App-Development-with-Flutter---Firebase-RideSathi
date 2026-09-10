@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/driver_location.dart';
 import '../models/ride_model.dart';
 import '../models/ride_request_draft.dart';
 import 'firestore_exception.dart';
@@ -75,6 +76,47 @@ class RideService {
       });
     } catch (e) {
       return Stream.error(FirestoreException.from(e));
+    }
+  }
+
+  /// Updates the driver's location for an active ride.
+  /// 
+  /// The [driverId] must match the currently authenticated user's ID to enforce ownership.
+  /// Throws a [FirestoreException] on failure.
+  Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) async {
+    if (rideId.trim().isEmpty) {
+      throw ArgumentError('Ride ID cannot be empty.');
+    }
+    if (driverId.trim().isEmpty) {
+      throw ArgumentError('Driver ID cannot be empty.');
+    }
+    if (!location.isValid) {
+      throw ArgumentError('Invalid location coordinates.');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+      
+      // Ownership validation: We conditionally update only if the driverId matches.
+      // Since we don't have backend security rules yet, we will fetch and verify client-side.
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) {
+        throw const FirestoreException('Ride not found.', code: 'not-found');
+      }
+
+      final data = snapshot.data();
+      if (data?['driverId'] != driverId) {
+        throw const FirestoreException('Unauthorized to update location for this ride.', code: 'permission-denied');
+      }
+
+      // Update the driverLocation field
+      await docRef.update({
+        'driverLocation': location.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
     }
   }
 }
