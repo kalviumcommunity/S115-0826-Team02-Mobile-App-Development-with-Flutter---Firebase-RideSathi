@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
@@ -78,6 +78,10 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
 
   void _handleProfile() {
     AppNavigator.toProfile(context);
+  }
+
+  void _handleHistory() {
+    AppNavigator.toRiderHistory(context);
   }
 
   @override
@@ -191,6 +195,8 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
         selectedIndex: 0,
         onDestinationSelected: (index) {
           if (index == 1) {
+            _handleHistory();
+          } else if (index == 2) {
             _handleProfile();
           }
         },
@@ -199,6 +205,11 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history_rounded),
+            label: 'History',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
