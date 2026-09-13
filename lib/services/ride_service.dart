@@ -119,4 +119,45 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
+
+  /// Cancels an active ride request on behalf of the rider.
+  /// 
+  /// The [riderId] must match the currently authenticated user's ID to enforce ownership.
+  /// Cannot cancel rides that are already in a terminal state (completed or cancelled).
+  /// Throws a [FirestoreException] on failure.
+  Future<void> cancelRide(String rideId, String riderId) async {
+    if (rideId.trim().isEmpty) {
+      throw ArgumentError('Ride ID cannot be empty.');
+    }
+    if (riderId.trim().isEmpty) {
+      throw ArgumentError('Rider ID cannot be empty.');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+      
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) {
+        throw const FirestoreException('Ride not found.', code: 'not-found');
+      }
+
+      final data = snapshot.data();
+      if (data?['riderId'] != riderId) {
+        throw const FirestoreException('Unauthorized to cancel this ride.', code: 'permission-denied');
+      }
+
+      final currentStatusStr = data?['status'] as String?;
+      if (currentStatusStr == RideStatus.completed.name || currentStatusStr == RideStatus.cancelled.name) {
+        throw const FirestoreException('Cannot cancel a ride that is already completed or cancelled.', code: 'invalid-state');
+      }
+
+      await docRef.update({
+        'status': RideStatus.cancelled.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
 }

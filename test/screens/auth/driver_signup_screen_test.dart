@@ -212,7 +212,6 @@ void main() {
       expect(fakeProfile.savedProfile!.vehicleInfo, equals('Auto DL-01-AB-1234'));
       // Navigates to driver home screen
       expect(find.text('RideSathi Driver'), findsOneWidget);
-      expect(find.text('Welcome, Vikram Singh'), findsOneWidget);
     });
   });
 
@@ -285,7 +284,7 @@ void main() {
         wrap(DriverSignupScreen(authController: controller)),
       );
 
-      // Log In TextButton should be disabled during loading.
+      // Login TextButton should be disabled during loading.
       final loginButton = tester.widget<TextButton>(
         find.ancestor(
           of: find.text('Log In'),

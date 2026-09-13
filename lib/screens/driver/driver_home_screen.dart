@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
@@ -258,12 +260,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
             
-            // DEBUG: Minimal integration boundary for PR 24 manual testing
-            // This is provided so the team can manually test Firebase writes 
-            // without fabricating a full fake active-ride screen.
-            // Replace 'debug_ride_123' with an actual ride document ID from Firestore.
-            const SizedBox(height: AppConstants.spaceM),
-            const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
+            // DEBUG ONLY: Render the location sharing banner using a placeholder ride ID.
+            if (kDebugMode && Firebase.apps.isNotEmpty) ...[
+              const SizedBox(height: AppConstants.spaceM),
+              const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
+            ],
             
             const SizedBox(height: AppConstants.spaceXL),
 

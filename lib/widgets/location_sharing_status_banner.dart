@@ -18,12 +18,18 @@ class LocationSharingStatusBanner extends StatefulWidget {
 class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanner> {
   late final DriverLocationController _controller;
 
+  void _onStateChanged() => setState(() {});
+
   @override
   void initState() {
     super.initState();
     _controller = DriverLocationController(rideId: widget.activeRideId);
-    // Auto-start publishing if possible
-    _controller.startPublishing();
+    _controller.addListener(_onStateChanged);
+    
+    // Auto-start sharing if allowed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.startPublishing();
+    });
   }
 
   @override
@@ -38,6 +44,7 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
 
   @override
   void dispose() {
+    _controller.removeListener(_onStateChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -114,7 +121,7 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
                   ),
                 ),
               ),
-              if (actionButton != null) actionButton,
+              ?actionButton,
             ],
           ),
         );

@@ -9,6 +9,8 @@ import '../../widgets/loading_view.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/driver_information_view.dart';
+import '../../widgets/confirmation_dialog.dart';
+import '../../core/state/ride_cancellation_controller.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -21,16 +23,19 @@ class RideStatusScreen extends StatefulWidget {
 
 class _RideStatusScreenState extends State<RideStatusScreen> {
   late final RideStatusController _statusController;
+  late final RideCancellationController _cancellationController;
 
   @override
   void initState() {
     super.initState();
     _statusController = RideStatusController(rideId: widget.rideId);
+    _cancellationController = RideCancellationController();
   }
 
   @override
   void dispose() {
     _statusController.dispose();
+    _cancellationController.dispose();
     super.dispose();
   }
 
@@ -162,19 +167,79 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
           
           const Spacer(),
           
-          CustomButton(
-            label: 'Return Home',
-            onPressed: () {
-              AppNavigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.riderHome,
-                (route) => false,
+          // Show any cancellation errors
+          ListenableBuilder(
+            listenable: _cancellationController,
+            builder: (context, _) {
+              final cancelState = _cancellationController.state;
+              if (cancelState.isError) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppConstants.spaceM),
+                  child: Text(
+                    cancelState.message ?? 'Cancellation failed.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          
+          // Action Buttons
+          ListenableBuilder(
+            listenable: _cancellationController,
+            builder: (context, _) {
+              final isLoading = _cancellationController.state.isLoading;
+              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!isTerminal) ...[
+                    CustomButton(
+                      label: isLoading ? 'Cancelling...' : 'Cancel Ride',
+                      onPressed: isLoading ? null : () => _handleCancel(context),
+                      // Visual distinction for destructive action:
+                      // Since CustomButton doesn't support a color override natively here, 
+                      // we just rely on the confirmation dialog to be clearly destructive.
+                    ),
+                    const SizedBox(height: AppConstants.spaceM),
+                  ],
+                  CustomButton(
+                    label: 'Return Home',
+                    onPressed: isLoading ? null : () {
+                      AppNavigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.riderHome,
+                        (route) => false,
+                      );
+                    },
+                  ),
+                ],
               );
             },
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleCancel(BuildContext context) async {
+    final confirmed = await showAppConfirmationDialog(
+      context,
+      title: 'Cancel Ride?',
+      message: 'Are you sure you want to cancel this ride? This action cannot be undone.',
+      confirmLabel: 'Cancel Ride',
+      cancelLabel: 'Keep Ride',
+      isDestructive: true,
+    );
+
+    if (confirmed == true && mounted) {
+      await _cancellationController.cancelRide(widget.rideId);
+    }
   }
 
   Widget _buildLocationRow(BuildContext context, String label, String value, IconData icon) {

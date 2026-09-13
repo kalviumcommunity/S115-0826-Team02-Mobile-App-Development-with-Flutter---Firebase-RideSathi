@@ -59,4 +59,81 @@ void main() {
       expect(() => service.updateDriverLocation('ride_1', validLocation, '   '), throwsArgumentError);
     });
   });
+
+  group('RideService cancelRide', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late RideService service;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      service = RideService(firestore: fakeFirestore);
+    });
+
+    test('successfully cancels a requested ride', () async {
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'rider_123',
+        'status': 'requested',
+      });
+
+      await service.cancelRide('ride_1', 'rider_123');
+
+      final doc = await fakeFirestore.collection('rides').doc('ride_1').get();
+      final data = doc.data()!;
+      expect(data['status'], equals('cancelled'));
+      expect(data['updatedAt'], isNotNull);
+    });
+
+    test('rejects cancellation if ride is not found', () async {
+      expect(
+        () => service.cancelRide('non_existent', 'rider_123'),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('not-found'))),
+      );
+    });
+
+    test('rejects cancellation if riderId does not match (wrong rider)', () async {
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'other_rider',
+        'status': 'requested',
+      });
+
+      expect(
+        () => service.cancelRide('ride_1', 'rider_123'),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('permission-denied'))),
+      );
+    });
+
+    test('rejects cancellation if ride is already completed', () async {
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'rider_123',
+        'status': 'completed',
+      });
+
+      expect(
+        () => service.cancelRide('ride_1', 'rider_123'),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('invalid-state'))),
+      );
+    });
+
+    test('rejects cancellation if ride is already cancelled', () async {
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'rider_123',
+        'status': 'cancelled',
+      });
+
+      expect(
+        () => service.cancelRide('ride_1', 'rider_123'),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('invalid-state'))),
+      );
+    });
+
+    test('throws ArgumentError on empty ride ID', () {
+      expect(() => service.cancelRide('', 'rider'), throwsArgumentError);
+      expect(() => service.cancelRide('   ', 'rider'), throwsArgumentError);
+    });
+
+    test('throws ArgumentError on empty rider ID', () {
+      expect(() => service.cancelRide('ride_1', ''), throwsArgumentError);
+      expect(() => service.cancelRide('ride_1', '   '), throwsArgumentError);
+    });
+  });
 }

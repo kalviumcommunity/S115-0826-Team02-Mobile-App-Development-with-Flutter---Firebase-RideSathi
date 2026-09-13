@@ -43,7 +43,7 @@ class MockRideService implements RideService {
   Future<RideModel> createRideRequest(dynamic draft, String riderId) => throw UnimplementedError();
 
   @override
-  Future<String> requestRide(dynamic request) => throw UnimplementedError();
+  Future<void> cancelRide(String rideId, String riderId) => throw UnimplementedError();
 
   @override
   Future<void> updateRideStatus(String rideId, RideStatus status) => throw UnimplementedError();
