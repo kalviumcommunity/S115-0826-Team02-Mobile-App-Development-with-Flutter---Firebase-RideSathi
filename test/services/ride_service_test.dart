@@ -136,4 +136,93 @@ void main() {
       expect(() => service.cancelRide('ride_1', '   '), throwsArgumentError);
     });
   });
+
+  group('RideService getRiderRideHistory', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late RideService service;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      service = RideService(firestore: fakeFirestore);
+    });
+
+    test('returns only rides for the specified rider, newest first', () async {
+      // Rider A rides
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'rider_A',
+        'status': 'requested',
+        'createdAt': DateTime(2023, 1, 1),
+      });
+      await fakeFirestore.collection('rides').doc('ride_2').set({
+        'riderId': 'rider_A',
+        'status': 'completed',
+        'createdAt': DateTime(2023, 1, 3), // Newest
+      });
+      // Rider B ride
+      await fakeFirestore.collection('rides').doc('ride_3').set({
+        'riderId': 'rider_B',
+        'status': 'requested',
+        'createdAt': DateTime(2023, 1, 2),
+      });
+
+      final history = await service.getRiderRideHistory('rider_A');
+      
+      expect(history.length, equals(2));
+      // Should be newest first
+      expect(history[0].id, equals('ride_2'));
+      expect(history[1].id, equals('ride_1'));
+    });
+
+    test('respects the limit parameter', () async {
+      for (int i = 0; i < 5; i++) {
+        await fakeFirestore.collection('rides').doc('ride_$i').set({
+          'riderId': 'rider_A',
+          'status': 'completed',
+          'createdAt': DateTime(2023, 1, i + 1),
+        });
+      }
+
+      final history = await service.getRiderRideHistory('rider_A', limit: 2);
+      
+      expect(history.length, equals(2));
+      // Newest first
+      expect(history[0].id, equals('ride_4'));
+      expect(history[1].id, equals('ride_3'));
+    });
+
+    test('returns empty list if no rides found', () async {
+      final history = await service.getRiderRideHistory('non_existent_rider');
+      expect(history, isEmpty);
+    });
+
+    test('gracefully skips malformed records without failing the whole query', () async {
+      await fakeFirestore.collection('rides').doc('valid_ride').set({
+        'riderId': 'rider_A',
+        'status': 'completed',
+        'createdAt': DateTime(2023, 1, 2),
+      });
+      await fakeFirestore.collection('rides').doc('invalid_ride').set({
+        'riderId': 'rider_A',
+        'status': 'invalid_enum_value', // Causes parsing failure
+        'createdAt': DateTime(2023, 1, 1),
+        // missing required fields if fromMap was strict, but we have fallbacks.
+        // Actually fromMap throws on entirely missing nested objects like pickup if we don't handle it,
+        // Wait, fromMap doesn't throw on status, it falls back to requested.
+        // Let's pass something that actually throws, e.g. wrong type for vehicleType that crashes?
+        // Let's just make it completely unparseable.
+        'estimatedFare': 'not_a_number', // Throws type error
+      });
+
+      final history = await service.getRiderRideHistory('rider_A');
+      
+      // Should only return the valid ride
+      expect(history.length, equals(1));
+      expect(history[0].id, equals('valid_ride'));
+    });
+
+    test('throws ArgumentError on empty rider ID', () {
+      expect(() => service.getRiderRideHistory(''), throwsArgumentError);
+      expect(() => service.getRiderRideHistory('   '), throwsArgumentError);
+    });
+  });
 }

@@ -160,4 +160,41 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
+  /// Retrieves the history of rides for the specified rider.
+  /// 
+  /// The [riderId] must match the currently authenticated user's ID to enforce ownership.
+  /// Results are ordered by `createdAt` descending, with a default [limit] of 20.
+  /// This query requires a Firestore composite index on `riderId` (ASC) and `createdAt` (DESC).
+  /// Throws a [FirestoreException] on failure.
+  Future<List<RideModel>> getRiderRideHistory(String riderId, {int limit = 20}) async {
+    if (riderId.trim().isEmpty) {
+      throw ArgumentError('Rider ID cannot be empty.');
+    }
+
+    try {
+      final querySnapshot = await _rides
+          .where('riderId', isEqualTo: riderId)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      final List<RideModel> history = [];
+
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data();
+        if (data == null) continue;
+
+        try {
+          history.add(RideModel.fromMap(data, doc.id));
+        } catch (e) {
+          // Gracefully skip malformed records so they don't break the entire history view
+          continue;
+        }
+      }
+
+      return history;
+    } catch (e) {
+      throw FirestoreException.from(e);
+    }
+  }
 }
