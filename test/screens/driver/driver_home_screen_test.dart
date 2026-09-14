@@ -12,7 +12,8 @@ import 'package:ridesathi/services/firebase_service.dart';
 class _FakeAuthService extends AuthService {
   final bool shouldFailSignOut;
   final Completer<void>? signOutCompleter;
-  const _FakeAuthService({this.shouldFailSignOut = false, this.signOutCompleter});
+  const _FakeAuthService(
+      {this.shouldFailSignOut = false, this.signOutCompleter});
 
   @override
   Future<void> userSignOut() async {
@@ -60,8 +61,10 @@ void main() {
     FirebaseService.isInitializedOverride = false;
   });
 
-  group('DriverHomeScreen — Layout and Driver Identity', () {
-    testWidgets('renders driver branding, vehicle info, and verification badge', (tester) async {
+  group('DriverHomeScreen — Layout, Driver Identity & Verification State', () {
+    testWidgets(
+        'renders driver branding, vehicle info, and pending verification badge',
+        (tester) async {
       await tester.pumpWidget(
         wrap(DriverHomeScreen(authController: controller)),
       );
@@ -72,10 +75,13 @@ void main() {
       expect(find.text('Driver Role Active'), findsOneWidget);
       expect(find.text('Pending Verification'), findsOneWidget);
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
-      expect(find.text('Trip Dispatch Console'), findsOneWidget);
+      expect(find.text('Registered Vehicle'), findsOneWidget);
+      expect(find.text('Union Verification Status'), findsOneWidget);
     });
 
-    testWidgets('renders verified badge when driver is union verified', (tester) async {
+    testWidgets(
+        'renders verified badge and message when driver is union verified',
+        (tester) async {
       final verifiedDriver = UserModel(
         id: 'driver-2',
         name: 'Harpreet Singh',
@@ -95,12 +101,99 @@ void main() {
       );
 
       expect(find.text('Union Verified'), findsOneWidget);
+      expect(find.text('Verified'), findsOneWidget);
+      expect(
+          find.text(
+              'Your union credentials and vehicle permit are fully verified.'),
+          findsOneWidget);
       expect(find.text('Cab KA-02-CD-5678'), findsOneWidget);
+    });
+
+    testWidgets(
+        'renders fallback text when vehicle information is missing or empty',
+        (tester) async {
+      final noVehicleDriver = UserModel(
+        id: 'driver-3',
+        name: 'Amit Kumar',
+        phoneNumber: '+919876543210',
+        role: UserRole.driver,
+        vehicleInfo: '',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final noVehicleController = AuthController(
+        initialState: AuthState.authenticated(noVehicleDriver),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: noVehicleController)),
+      );
+
+      expect(find.text('Vehicle details not available'), findsOneWidget);
+      expect(find.text('Not Set'), findsOneWidget);
+    });
+  });
+
+  group('DriverHomeScreen — Session Isolation & Verification State Safety',
+      () {
+    testWidgets(
+        'verified Driver A logout and unverified Driver B login preserves strict session isolation',
+        (tester) async {
+      final driverA = UserModel(
+        id: 'driver-A',
+        name: 'Driver Alpha',
+        phoneNumber: '+919000000001',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto KA-01-A-1111',
+        isUnionVerified: true,
+        createdAt: DateTime.now(),
+      );
+
+      final driverB = UserModel(
+        id: 'driver-B',
+        name: 'Driver Bravo',
+        phoneNumber: '+919000000002',
+        role: UserRole.driver,
+        vehicleInfo: 'Cab KA-02-B-2222',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final authCtrl = AuthController(
+        initialState: AuthState.authenticated(driverA),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: authCtrl)),
+      );
+
+      expect(find.text('Welcome, Driver Alpha'), findsOneWidget);
+      expect(find.text('Union Verified'), findsOneWidget);
+
+      // Sign out Driver A
+      await authCtrl.signOut();
+      await tester.pumpAndSettle();
+
+      // Sign in Driver B
+      authCtrl.restoreSession(driverB);
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: authCtrl)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Welcome, Driver Bravo'), findsOneWidget);
+      expect(find.text('Pending Verification'), findsOneWidget);
+
+      expect(find.text('Welcome, Driver Alpha'), findsNothing);
+      expect(find.text('Union Verified'), findsNothing);
     });
   });
 
   group('DriverHomeScreen — Logout Workflow', () {
-    testWidgets('successful logout clears stack and navigates to LoginScreen', (tester) async {
+    testWidgets(
+        'successful logout clears stack and navigates to LoginScreen',
+        (tester) async {
       await tester.pumpWidget(
         wrap(DriverHomeScreen(authController: controller)),
       );
@@ -128,7 +221,9 @@ void main() {
       expect(find.text('Sign out failed due to network.'), findsOneWidget);
     });
 
-    testWidgets('shows loading indicator and disables logout button during logout', (tester) async {
+    testWidgets(
+        'shows loading indicator and disables logout button during logout',
+        (tester) async {
       final completer = Completer<void>();
       final slowController = AuthController(
         authService: _FakeAuthService(signOutCompleter: completer),
@@ -142,15 +237,12 @@ void main() {
       expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
-      // Tap logout
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
 
-      // Spinner appears in place of icon
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byIcon(Icons.logout_rounded), findsNothing);
 
-      // Complete sign-out
       completer.complete();
       await tester.pumpAndSettle();
 
@@ -158,7 +250,9 @@ void main() {
       expect(find.text('Sign in to continue'), findsOneWidget);
     });
 
-    testWidgets('rapid repeated taps on logout do not crash or produce duplicate navigation', (tester) async {
+    testWidgets(
+        'rapid repeated taps on logout do not crash or produce duplicate navigation',
+        (tester) async {
       final completer = Completer<void>();
       final slowController = AuthController(
         authService: _FakeAuthService(signOutCompleter: completer),
@@ -169,7 +263,6 @@ void main() {
         wrap(DriverHomeScreen(authController: slowController)),
       );
 
-      // Tap multiple times rapidly
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
       await tester.tap(find.byType(IconButton).last, warnIfMissed: false);
