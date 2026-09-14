@@ -65,13 +65,16 @@ class UserModel {
       throw FormatException('Invalid or unrecognized user role: "$roleString"');
     }
 
+    final rawVerified = map['isUnionVerified'];
+    final bool parsedVerified = rawVerified is bool ? rawVerified : false;
+
     return UserModel(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       phoneNumber: map['phoneNumber'] as String? ?? '',
       email: map['email'] as String?,
       role: parsedRole,
-      isUnionVerified: map['isUnionVerified'] as bool? ?? false,
+      isUnionVerified: parsedVerified,
       vehicleInfo: map['vehicleInfo'] as String?,
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'] as String)
