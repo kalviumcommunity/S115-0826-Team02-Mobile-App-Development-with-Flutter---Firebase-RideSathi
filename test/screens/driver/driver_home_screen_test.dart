@@ -72,7 +72,8 @@ void main() {
       expect(find.text('Driver Role Active'), findsOneWidget);
       expect(find.text('Pending Verification'), findsOneWidget);
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
-      expect(find.text('Trip Dispatch Console'), findsOneWidget);
+      expect(find.text('Incoming Ride Requests'), findsOneWidget);
+      expect(find.text('Offline — Unavailable'), findsOneWidget);
     });
 
     testWidgets('renders verified badge when driver is union verified', (tester) async {
@@ -96,6 +97,21 @@ void main() {
 
       expect(find.text('Union Verified'), findsOneWidget);
       expect(find.text('Cab KA-02-CD-5678'), findsOneWidget);
+    });
+
+    testWidgets('toggling availability switch updates availability text and offline view state', (tester) async {
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: controller)),
+      );
+
+      expect(find.text('Offline — Unavailable'), findsOneWidget);
+      expect(find.text('Driver is Offline'), findsOneWidget);
+
+      // Tap availability switch
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Online — Receiving Requests'), findsOneWidget);
     });
   });
 
