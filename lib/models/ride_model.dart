@@ -6,6 +6,7 @@ import 'location_model.dart';
 enum RideStatus {
   requested,
   accepted,
+  rejected,
   arrived,
   inProgress,
   completed,

@@ -129,6 +129,12 @@ class StatusBadge extends StatelessWidget {
           icon: Icons.cancel_rounded,
         );
 
+      case 'rejected':
+        return const _StatusStyleInfo(
+          color: Color(0xFF9CA3AF), // Cool Gray
+          icon: Icons.close_rounded,
+        );
+
       case 'no show':
       case 'no_show':
         return const _StatusStyleInfo(

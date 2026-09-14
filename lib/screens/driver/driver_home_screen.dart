@@ -6,6 +6,7 @@ import '../../core/routes/app_routes.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/incoming_ride_requests_controller.dart';
 import '../../core/state/ride_acceptance_controller.dart';
+import '../../core/state/ride_rejection_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../models/ride_model.dart';
 import '../../models/user_model.dart';
@@ -31,6 +32,9 @@ class DriverHomeScreen extends StatefulWidget {
   /// Optional [RideAcceptanceController] for dependency injection in tests.
   final RideAcceptanceController? acceptanceController;
 
+  /// Optional [RideRejectionController] for dependency injection in tests.
+  final RideRejectionController? rejectionController;
+
   /// Optional [UserModel] for explicit user identity passing.
   final UserModel? user;
 
@@ -39,6 +43,7 @@ class DriverHomeScreen extends StatefulWidget {
     this.authController,
     this.requestsController,
     this.acceptanceController,
+    this.rejectionController,
     this.user,
   });
 
@@ -50,9 +55,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final AuthController _authController;
   late final IncomingRideRequestsController _requestsController;
   late final RideAcceptanceController _acceptanceController;
+  late final RideRejectionController _rejectionController;
   bool _isLoggingOut = false;
   bool _ownsRequestsController = false;
   bool _ownsAcceptanceController = false;
+  bool _ownsRejectionController = false;
 
   @override
   void initState() {
@@ -79,7 +86,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _ownsAcceptanceController = true;
     }
 
+    if (widget.rejectionController != null) {
+      _rejectionController = widget.rejectionController!;
+      _ownsRejectionController = false;
+    } else {
+      _rejectionController = RideRejectionController(
+        authController: _authController,
+        requestsController: _requestsController,
+      );
+      _ownsRejectionController = true;
+    }
+
     _acceptanceController.addListener(_onAcceptanceStateChanged);
+    _rejectionController.addListener(_onRejectionStateChanged);
+  }
+
+  void _onRejectionStateChanged() {
+    final state = _rejectionController.state;
+    if (state.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Ride rejected.'),
+        ),
+      );
+    } else if (state.isError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Failed to reject ride.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _rejectionController.clearError();
+    }
   }
 
   void _onAcceptanceStateChanged() {
@@ -105,8 +143,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void dispose() {
     _acceptanceController.removeListener(_onAcceptanceStateChanged);
+    _rejectionController.removeListener(_onRejectionStateChanged);
     if (_ownsAcceptanceController) {
       _acceptanceController.dispose();
+    }
+    if (_ownsRejectionController) {
+      _rejectionController.dispose();
     }
     if (_ownsRequestsController) {
       _requestsController.dispose();
@@ -525,38 +567,76 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         );
                       },
                       actionButton: AnimatedBuilder(
-                        animation: _acceptanceController,
+                        animation: Listenable.merge([_acceptanceController, _rejectionController]),
                         builder: (context, _) {
-                          final isLoading = _acceptanceController.state.isLoading;
-                          return SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: isLoading
-                                  ? null
-                                  : () => _acceptanceController.acceptRide(ride.id),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                          final isAccepting = _acceptanceController.state.isLoading;
+                          final isRejecting = _rejectionController.state.isLoading;
+                          final isBusy = isAccepting || isRejecting;
+
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _rejectionController.rejectRide(ride.id),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.red,
+                                    side: BorderSide(
+                                      color: isBusy ? Colors.grey : Colors.red,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                                    ),
+                                  ),
+                                  icon: isRejecting
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                                          ),
+                                        )
+                                      : const Icon(Icons.close_rounded),
+                                  label: Text(
+                                    isRejecting ? 'Rejecting...' : 'Reject',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                               ),
-                              icon: isLoading
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : const Icon(Icons.check_circle_outline_rounded),
-                              label: Text(
-                                isLoading ? 'Accepting...' : 'Accept Ride',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              const SizedBox(width: AppConstants.spaceM),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _acceptanceController.acceptRide(ride.id),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                                    ),
+                                  ),
+                                  icon: isAccepting
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Icon(Icons.check_circle_outline_rounded),
+                                  label: Text(
+                                    isAccepting ? 'Accepting...' : 'Accept Ride',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           );
                         },
                       ),
