@@ -4,10 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
+import 'package:ridesathi/core/state/driver_availability_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/driver/driver_home_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
+import '../../services/driver_availability_service_test.dart';
 
 class _FakeAuthService extends AuthService {
   final bool shouldFailSignOut;
@@ -27,6 +29,7 @@ class _FakeAuthService extends AuthService {
 
 void main() {
   late AuthController controller;
+  late FakeDriverAvailabilityService fakeAvailabilityService;
 
   Widget wrap(Widget child) {
     return MaterialApp(
@@ -43,12 +46,14 @@ void main() {
     role: UserRole.driver,
     vehicleInfo: 'Auto DL-01-AB-1234',
     isUnionVerified: false,
+    isOnline: false,
     createdAt: DateTime.now(),
   );
 
   setUp(() {
     AuthController.resetInstance();
     FirebaseService.isInitializedOverride = true;
+    fakeAvailabilityService = FakeDriverAvailabilityService();
     controller = AuthController(
       authService: const _FakeAuthService(),
       initialState: AuthState.authenticated(dummyDriver),
@@ -72,7 +77,6 @@ void main() {
       expect(find.text('Driver Role Active'), findsOneWidget);
       expect(find.text('Pending Verification'), findsOneWidget);
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
-      expect(find.text('Trip Dispatch Console'), findsOneWidget);
     });
 
     testWidgets('renders verified badge when driver is union verified', (tester) async {
@@ -83,6 +87,7 @@ void main() {
         role: UserRole.driver,
         vehicleInfo: 'Cab KA-02-CD-5678',
         isUnionVerified: true,
+        isOnline: false,
         createdAt: DateTime.now(),
       );
 
@@ -96,6 +101,73 @@ void main() {
 
       expect(find.text('Union Verified'), findsOneWidget);
       expect(find.text('Cab KA-02-CD-5678'), findsOneWidget);
+    });
+  });
+
+  group('DriverHomeScreen — Driver Availability Toggling', () {
+    testWidgets('renders Offline status card and Go Online button by default', (tester) async {
+      final availCtrl = DriverAvailabilityController(
+        authController: controller,
+        availabilityService: fakeAvailabilityService,
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(
+          authController: controller,
+          availabilityController: availCtrl,
+        )),
+      );
+
+      expect(find.text('Driver Availability'), findsOneWidget);
+      expect(find.text('Offline'), findsOneWidget);
+      expect(find.text('You are currently not available for new rides.'), findsOneWidget);
+      expect(find.text('Go Online'), findsOneWidget);
+    });
+
+    testWidgets('toggling availability from Offline to Online updates UI to Online state', (tester) async {
+      final availCtrl = DriverAvailabilityController(
+        authController: controller,
+        availabilityService: fakeAvailabilityService,
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(
+          authController: controller,
+          availabilityController: availCtrl,
+        )),
+      );
+
+      expect(find.text('Go Online'), findsOneWidget);
+
+      await tester.tap(find.text('Go Online'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Online'), findsOneWidget);
+      expect(find.text('You are currently available for new rides.'), findsOneWidget);
+      expect(find.text('Go Offline'), findsOneWidget);
+    });
+
+    testWidgets('renders Online status card when initial state is Online', (tester) async {
+      final onlineDriver = dummyDriver.copyWith(isOnline: true);
+      final onlineAuthCtrl = AuthController(
+        initialState: AuthState.authenticated(onlineDriver),
+      );
+
+      final availCtrl = DriverAvailabilityController(
+        authController: onlineAuthCtrl,
+        availabilityService: fakeAvailabilityService,
+        initialOnline: true,
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(
+          authController: onlineAuthCtrl,
+          availabilityController: availCtrl,
+        )),
+      );
+
+      expect(find.text('Online'), findsOneWidget);
+      expect(find.text('Go Offline'), findsOneWidget);
     });
   });
 
@@ -142,15 +214,12 @@ void main() {
       expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
-      // Tap logout
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
 
-      // Spinner appears in place of icon
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byIcon(Icons.logout_rounded), findsNothing);
 
-      // Complete sign-out
       completer.complete();
       await tester.pumpAndSettle();
 
@@ -169,7 +238,6 @@ void main() {
         wrap(DriverHomeScreen(authController: slowController)),
       );
 
-      // Tap multiple times rapidly
       await tester.tap(find.byIcon(Icons.logout_rounded));
       await tester.pump();
       await tester.tap(find.byType(IconButton).last, warnIfMissed: false);
