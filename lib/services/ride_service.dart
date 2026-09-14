@@ -197,4 +197,59 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
+
+  /// Submits feedback for a completed ride.
+  /// 
+  /// The [riderId] must match the currently authenticated user's ID to enforce ownership.
+  /// Throws [ArgumentError] if [rating] is out of bounds or [comment] is too long.
+  /// Throws [FirestoreException] on failure (e.g. duplicate feedback, not completed).
+  Future<void> submitRideFeedback(String rideId, String riderId, int rating, {String? comment}) async {
+    if (rideId.trim().isEmpty) throw ArgumentError('Ride ID cannot be empty.');
+    if (riderId.trim().isEmpty) throw ArgumentError('Rider ID cannot be empty.');
+    if (rating < 1 || rating > 5) throw ArgumentError('Rating must be between 1 and 5.');
+    if (comment != null && comment.length > 500) {
+      throw ArgumentError('Comment must not exceed 500 characters.');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId);
+      
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          throw FirestoreException('not-found', 'Ride not found.');
+        }
+
+        final data = snapshot.data();
+        if (data == null) {
+          throw FirestoreException('not-found', 'Ride data is empty.');
+        }
+
+        if (data['riderId'] != riderId) {
+          throw FirestoreException('permission-denied', 'Only the original rider can submit feedback for this ride.');
+        }
+
+        if (data['status'] != RideStatus.completed.name) {
+          throw FirestoreException('invalid-state', 'Feedback can only be submitted for completed rides.');
+        }
+
+        if (data['feedback'] != null) {
+          throw FirestoreException('already-exists', 'Feedback has already been submitted for this ride.');
+        }
+
+        transaction.update(docRef, {
+          'feedback': {
+            'rating': rating,
+            if (comment != null) 'comment': comment,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
 }
