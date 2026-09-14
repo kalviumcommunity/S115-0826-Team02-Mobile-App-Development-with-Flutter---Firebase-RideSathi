@@ -225,4 +225,75 @@ void main() {
       expect(() => service.getRiderRideHistory('   '), throwsArgumentError);
     });
   });
+
+  group('RideService watchIncomingRideRequests', () {
+    late FakeFirebaseFirestore fakeFirestore;
+    late RideService service;
+
+    setUp(() {
+      fakeFirestore = FakeFirebaseFirestore();
+      service = RideService(firestore: fakeFirestore);
+    });
+
+    test('streams incoming requests assigned to the specified driver with requested status', () async {
+      await fakeFirestore.collection('rides').doc('ride_1').set({
+        'riderId': 'rider_1',
+        'driverId': 'driver_123',
+        'status': 'requested',
+        'estimatedFare': 120.0,
+      });
+
+      // Different driver
+      await fakeFirestore.collection('rides').doc('ride_2').set({
+        'riderId': 'rider_2',
+        'driverId': 'driver_999',
+        'status': 'requested',
+        'estimatedFare': 200.0,
+      });
+
+      // Same driver, but accepted status
+      await fakeFirestore.collection('rides').doc('ride_3').set({
+        'riderId': 'rider_3',
+        'driverId': 'driver_123',
+        'status': 'accepted',
+        'estimatedFare': 150.0,
+      });
+
+      final stream = service.watchIncomingRideRequests('driver_123');
+      final list = await stream.first;
+
+      expect(list.length, equals(1));
+      expect(list.first.id, equals('ride_1'));
+      expect(list.first.driverId, equals('driver_123'));
+      expect(list.first.status, equals(RideStatus.requested));
+    });
+
+    test('skips malformed documents without crashing the stream', () async {
+      await fakeFirestore.collection('rides').doc('valid_ride').set({
+        'riderId': 'rider_1',
+        'driverId': 'driver_123',
+        'status': 'requested',
+        'estimatedFare': 100.0,
+      });
+
+      await fakeFirestore.collection('rides').doc('malformed_ride').set({
+        'riderId': 'rider_2',
+        'driverId': 'driver_123',
+        'status': 'requested',
+        'estimatedFare': 'invalid_number', // Throws exception on parsing
+      });
+
+      final list = await service.watchIncomingRideRequests('driver_123').first;
+
+      expect(list.length, equals(1));
+      expect(list.first.id, equals('valid_ride'));
+    });
+
+    test('emits error when driverId is empty', () {
+      expect(
+        service.watchIncomingRideRequests(''),
+        emitsError(isA<FirestoreException>()),
+      );
+    });
+  });
 }
