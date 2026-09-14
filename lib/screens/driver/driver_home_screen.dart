@@ -1,27 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:ridesathi/core/constants/app_constants.dart';
-import 'package:ridesathi/core/routes/app_routes.dart';
-import 'package:ridesathi/core/state/auth_controller.dart';
-import 'package:ridesathi/core/theme/theme_controller.dart';
-import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/widgets/info_card.dart';
-import 'package:ridesathi/widgets/location_sharing_status_banner.dart';
-import 'package:ridesathi/widgets/union_badge.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/state/auth_controller.dart';
+import '../../core/state/incoming_ride_requests_controller.dart';
+import '../../core/state/ride_acceptance_controller.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../models/ride_model.dart';
+import '../../models/user_model.dart';
+import '../../widgets/empty_state_view.dart';
+import '../../widgets/error_view.dart';
+import '../../widgets/info_card.dart';
+import '../../widgets/loading_view.dart';
+import '../../widgets/location_sharing_status_banner.dart';
+import '../../widgets/ride_summary_card.dart';
+import '../../widgets/union_badge.dart';
 
 /// Landing and dashboard screen for authenticated Drivers in RideSathi.
 ///
-/// Displays driver identity, vehicle details, union verification status,
-/// and supports clean logout with navigation stack clearing.
+/// Displays driver identity, vehicle details, availability status (Online/Offline),
+/// incoming ride request queue, and supports clean logout with navigation stack clearing.
 class DriverHomeScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
 
+  /// Optional [IncomingRideRequestsController] for dependency injection in tests.
+  final IncomingRideRequestsController? requestsController;
+
+  /// Optional [RideAcceptanceController] for dependency injection in tests.
+  final RideAcceptanceController? acceptanceController;
+
   /// Optional [UserModel] for explicit user identity passing.
   final UserModel? user;
 
-  const DriverHomeScreen({super.key, this.authController, this.user});
+  const DriverHomeScreen({
+    super.key,
+    this.authController,
+    this.requestsController,
+    this.acceptanceController,
+    this.user,
+  });
 
   @override
   State<DriverHomeScreen> createState() => _DriverHomeScreenState();
@@ -29,12 +48,70 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final AuthController _authController;
+  late final IncomingRideRequestsController _requestsController;
+  late final RideAcceptanceController _acceptanceController;
   bool _isLoggingOut = false;
+  bool _ownsRequestsController = false;
+  bool _ownsAcceptanceController = false;
 
   @override
   void initState() {
     super.initState();
     _authController = widget.authController ?? AuthController.instance;
+    if (widget.requestsController != null) {
+      _requestsController = widget.requestsController!;
+      _ownsRequestsController = false;
+    } else {
+      _requestsController = IncomingRideRequestsController(
+        authController: _authController,
+      );
+      _ownsRequestsController = true;
+    }
+
+    if (widget.acceptanceController != null) {
+      _acceptanceController = widget.acceptanceController!;
+      _ownsAcceptanceController = false;
+    } else {
+      _acceptanceController = RideAcceptanceController(
+        authController: _authController,
+        requestsController: _requestsController,
+      );
+      _ownsAcceptanceController = true;
+    }
+
+    _acceptanceController.addListener(_onAcceptanceStateChanged);
+  }
+
+  void _onAcceptanceStateChanged() {
+    final state = _acceptanceController.state;
+    if (state.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Ride accepted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (state.isError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Failed to accept ride.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _acceptanceController.clearError();
+    }
+  }
+
+  @override
+  void dispose() {
+    _acceptanceController.removeListener(_onAcceptanceStateChanged);
+    if (_ownsAcceptanceController) {
+      _acceptanceController.dispose();
+    }
+    if (_ownsRequestsController) {
+      _requestsController.dispose();
+    }
+    super.dispose();
   }
 
   UserModel? get _currentUser => widget.user ?? _authController.currentUser;
@@ -42,6 +119,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
     setState(() => _isLoggingOut = true);
+
+    _requestsController.setOnline(false);
 
     final success = await _authController.signOut();
 
@@ -65,6 +144,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       );
       _authController.clearError();
     }
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final month = months[dateTime.month - 1];
+    final hour = dateTime.hour == 0 ? 12 : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+    final period = dateTime.hour < 12 ? 'AM' : 'PM';
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+
+    return '$month ${dateTime.day}, ${dateTime.year} - $hour:$minute $period';
   }
 
   @override
@@ -259,6 +351,73 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ],
               ),
             ),
+
+            // Availability Toggle Banner
+            const SizedBox(height: AppConstants.spaceL),
+            AnimatedBuilder(
+              animation: _requestsController,
+              builder: (context, _) {
+                final isOnline = _requestsController.isOnline;
+                return Card(
+                  elevation: 2,
+                  color: isOnline
+                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
+                      : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                    side: BorderSide(
+                      color: isOnline ? Colors.green : Colors.grey,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppConstants.spaceL),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isOnline ? Icons.sensors_rounded : Icons.sensors_off_rounded,
+                          color: isOnline ? Colors.green : Colors.grey,
+                          size: 28,
+                        ),
+                        const SizedBox(width: AppConstants.spaceM),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isOnline ? 'Online — Receiving Requests' : 'Offline — Unavailable',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: isOnline
+                                      ? (isDark ? Colors.greenAccent : const Color(0xFF065F46))
+                                      : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isOnline
+                                    ? 'Available for incoming ride assignments'
+                                    : 'Turn online to start receiving ride requests',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: isOnline,
+                          activeColor: Colors.green,
+                          onChanged: (val) {
+                            _requestsController.setOnline(val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
             
             // DEBUG ONLY: Render the location sharing banner using a placeholder ride ID.
             if (kDebugMode && Firebase.apps.isNotEmpty) ...[
@@ -266,6 +425,147 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
             ],
             
+            const SizedBox(height: AppConstants.spaceXL),
+
+            // Incoming Ride Requests Section Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Incoming Ride Requests',
+                  style: theme.textTheme.titleLarge,
+                ),
+                AnimatedBuilder(
+                  animation: _requestsController,
+                  builder: (context, _) {
+                    final count = _requestsController.requestCount;
+                    if (!_requestsController.isOnline || count == 0) {
+                      return const SizedBox.shrink();
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$count Active',
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: AppConstants.spaceM),
+
+            // Incoming Ride Requests List / Content
+            AnimatedBuilder(
+              animation: _requestsController,
+              builder: (context, _) {
+                if (!_requestsController.isOnline) {
+                  return const EmptyStateView(
+                    title: 'Driver is Offline',
+                    message: 'Switch your availability to Online above to receive incoming ride requests.',
+                    icon: Icons.wifi_off_rounded,
+                  );
+                }
+
+                final state = _requestsController.state;
+
+                if (state.isLoading) {
+                  return const LoadingView(
+                    message: 'Checking incoming requests...',
+                  );
+                }
+
+                if (state.isError) {
+                  return ErrorView(
+                    message: state.message ?? 'Failed to load incoming requests.',
+                    onRetry: () => _requestsController.startListening(),
+                  );
+                }
+
+                if (state.isEmpty || state.data == null || state.data!.isEmpty) {
+                  return const EmptyStateView(
+                    title: 'No incoming ride requests',
+                    message: 'You are online. Eligible ride requests assigned to you will appear here automatically.',
+                    icon: Icons.inbox_rounded,
+                  );
+                }
+
+                final requests = state.data!;
+
+                return Column(
+                  children: requests.map((ride) {
+                    return RideSummaryCard(
+                      pickupAddress: ride.pickup.address.trim().isNotEmpty
+                          ? ride.pickup.address
+                          : 'Pickup address pending',
+                      dropoffAddress: ride.destination.address.trim().isNotEmpty
+                          ? ride.destination.address
+                          : 'Destination address pending',
+                      status: ride.status.name,
+                      dateTime: _formatDateTime(ride.createdAt),
+                      fare: '₹${ride.estimatedFare.toStringAsFixed(0)}',
+                      vehicleInfo: 'Vehicle: ${ride.vehicleType.name}',
+                      onTap: () {
+                        // Request detail preview / inspect action (PR 33 read-only)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Inspecting request #${ride.id}. Accept/Reject actions active in PR 34/35.',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      actionButton: AnimatedBuilder(
+                        animation: _acceptanceController,
+                        builder: (context, _) {
+                          final isLoading = _acceptanceController.state.isLoading;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _acceptanceController.acceptRide(ride.id),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                                ),
+                              ),
+                              icon: isLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle_outline_rounded),
+                              label: Text(
+                                isLoading ? 'Accepting...' : 'Accept Ride',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
             const SizedBox(height: AppConstants.spaceXL),
 
             // Registered Vehicle Details
@@ -293,18 +593,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ? Icons.verified_user_rounded
                   : Icons.pending_actions_rounded,
               iconColor: isVerified ? Colors.green : Colors.orange,
-              badgeText: isVerified ? 'Verified' : 'Pending (PR 29)',
+              badgeText: isVerified ? 'Verified' : 'Pending',
               badgeColor: isVerified ? Colors.green : Colors.orange,
-            ),
-
-            InfoCard(
-              title: 'Trip Dispatch Console',
-              description:
-                  'Real-time passenger hailing and dispatch queue.',
-              icon: Icons.dashboard_customize_rounded,
-              iconColor: Colors.teal,
-              badgeText: 'PR 29 Upcoming',
-              badgeColor: Colors.grey,
             ),
           ],
         ),
