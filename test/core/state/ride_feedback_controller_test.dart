@@ -81,7 +81,7 @@ void main() {
       final result = await controller.submitFeedback('ride_1', 4, null);
       expect(result, isFalse);
       expect(controller.state.hasError, isTrue);
-      expect(controller.state.error, contains('not authenticated'));
+      expect(controller.state.message, contains('not authenticated'));
     });
 
     test('returns false and sets error for rating below 1', () async {
@@ -110,15 +110,15 @@ void main() {
     });
 
     test('handles FirestoreException duplicate feedback', () async {
-      mockService.feedbackError = FirestoreException('already-exists', 'Feedback already submitted.');
+      mockService.feedbackError = FirestoreException('Feedback already submitted.', code: 'already-exists');
       final result = await controller.submitFeedback('ride_1', 4, null);
       expect(result, isFalse);
       expect(controller.state.hasError, isTrue);
-      expect(controller.state.error, equals('Feedback already submitted.'));
+      expect(controller.state.message, equals('Feedback already submitted.'));
     });
 
     test('handles FirestoreException permission-denied', () async {
-      mockService.feedbackError = FirestoreException('permission-denied', 'Access denied.');
+      mockService.feedbackError = FirestoreException('Access denied.', code: 'permission-denied');
       final result = await controller.submitFeedback('ride_1', 4, null);
       expect(result, isFalse);
       expect(controller.state.hasError, isTrue);
@@ -137,7 +137,7 @@ void main() {
     });
 
     test('reset clears error state', () async {
-      mockService.feedbackError = FirestoreException('not-found', 'Ride not found.');
+      mockService.feedbackError = FirestoreException('Ride not found.', code: 'not-found');
       await controller.submitFeedback('ride_1', 4, null);
       expect(controller.state.hasError, isTrue);
       controller.reset();

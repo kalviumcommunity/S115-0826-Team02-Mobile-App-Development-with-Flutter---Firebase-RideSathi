@@ -218,24 +218,24 @@ class RideService {
         final snapshot = await transaction.get(docRef);
 
         if (!snapshot.exists) {
-          throw FirestoreException('not-found', 'Ride not found.');
+          throw FirestoreException('Ride not found.', code: 'not-found');
         }
 
         final data = snapshot.data();
         if (data == null) {
-          throw FirestoreException('not-found', 'Ride data is empty.');
+          throw FirestoreException('Ride data is empty.', code: 'not-found');
         }
 
         if (data['riderId'] != riderId) {
-          throw FirestoreException('permission-denied', 'Only the original rider can submit feedback for this ride.');
+          throw FirestoreException('Only the original rider can submit feedback for this ride.', code: 'permission-denied');
         }
 
         if (data['status'] != RideStatus.completed.name) {
-          throw FirestoreException('invalid-state', 'Feedback can only be submitted for completed rides.');
+          throw FirestoreException('Feedback can only be submitted for completed rides.', code: 'invalid-state');
         }
 
         if (data['feedback'] != null) {
-          throw FirestoreException('already-exists', 'Feedback has already been submitted for this ride.');
+          throw FirestoreException('Feedback has already been submitted for this ride.', code: 'already-exists');
         }
 
         transaction.update(docRef, {
