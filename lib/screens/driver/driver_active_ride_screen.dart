@@ -3,12 +3,15 @@ import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/active_ride_controller.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/driver_location_controller.dart';
 import '../../core/state/ride_progress_controller.dart';
 import '../../models/ride_model.dart';
+import '../../services/location_provider.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/location_display.dart';
+import '../../widgets/location_sharing_status_banner.dart';
 import '../../widgets/status_badge.dart';
 
 /// Driver-facing Active Ride screen for RideSathi.
@@ -16,13 +19,14 @@ import '../../widgets/status_badge.dart';
 /// Displays the driver's current operational ride with full details and
 /// status-appropriate action buttons:
 ///
-///   accepted  → [ Arrived ]
-///   arrived   → [ Start Ride ]
-///   inProgress → [ Complete Ride ]
-///   completed → (navigates back to Driver Home)
+///   accepted  → [ Arrived at Pickup ]          location OFF
+///   arrived   → [ Start Ride ]                 location ON
+///   inProgress → [ Complete Ride ]             location ON
+///   completed → (navigates back to Driver Home) location OFF
 ///
-/// Real-time updates via [ActiveRideController] ensure the UI reflects
-/// the authoritative Firestore state.
+/// Location sharing is activated automatically when the ride reaches
+/// [arrived] or [inProgress] using the existing [DriverLocationController].
+/// It stops on completion, cancellation, logout, or disposal.
 class DriverActiveRideScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
@@ -33,11 +37,15 @@ class DriverActiveRideScreen extends StatefulWidget {
   /// Optional [RideProgressController] for dependency injection in tests.
   final RideProgressController? progressController;
 
+  /// Optional [LocationProvider] for dependency injection in tests.
+  final LocationProvider? locationProvider;
+
   const DriverActiveRideScreen({
     super.key,
     this.authController,
     this.activeRideController,
     this.progressController,
+    this.locationProvider,
   });
 
   @override
@@ -50,6 +58,10 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
   late final RideProgressController _progressController;
   bool _ownsActiveRideController = false;
   bool _ownsProgressController = false;
+
+  /// Location controller, created lazily when an operational ride is first confirmed.
+  DriverLocationController? _locationController;
+  String? _locationRideId; // track which rideId the controller is for
 
   @override
   void initState() {
@@ -96,8 +108,34 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
   }
 
   void _onRideStateChanged() {
-    // When ride completes or disappears, navigate back to Driver Home
     final activeRide = _activeRideController.activeRide;
+    
+    // Manage location sharing lifecycle based on ride status
+    if (activeRide != null && 
+        (activeRide.status == RideStatus.arrived || activeRide.status == RideStatus.inProgress)) {
+      if (_locationController == null || _locationRideId != activeRide.id) {
+        _locationController?.dispose();
+        _locationRideId = activeRide.id;
+        _locationController = DriverLocationController(
+          rideId: activeRide.id,
+          authController: _authController,
+          locationProvider: widget.locationProvider,
+        )..startPublishing();
+        // Force rebuild to show banner
+        if (mounted) setState(() {});
+      }
+    } else {
+      // Not in an operational state, stop/dispose location sharing
+      if (_locationController != null) {
+        _locationController?.stopPublishing();
+        _locationController?.dispose();
+        _locationController = null;
+        _locationRideId = null;
+        if (mounted) setState(() {});
+      }
+    }
+
+    // When ride completes or disappears, navigate back to Driver Home
     final isEmptyOrCompleted = _activeRideController.state.isEmpty ||
         (activeRide != null &&
             (activeRide.status == RideStatus.completed ||
@@ -130,6 +168,8 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
 
   @override
   void dispose() {
+    _locationController?.stopPublishing();
+    _locationController?.dispose();
     _progressController.removeListener(_onProgressChanged);
     _activeRideController.removeListener(_onRideStateChanged);
     if (_ownsProgressController) _progressController.dispose();
@@ -247,6 +287,11 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
           _StatusBanner(ride: ride, isDark: isDark),
 
           const SizedBox(height: AppConstants.spaceXL),
+          
+          if (_locationController != null) ...[
+            LocationSharingStatusBanner(controller: _locationController!),
+            const SizedBox(height: AppConstants.spaceXL),
+          ],
 
           // Route
           Card(

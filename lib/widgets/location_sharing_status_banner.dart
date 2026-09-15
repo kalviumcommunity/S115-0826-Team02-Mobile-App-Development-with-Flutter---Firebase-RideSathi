@@ -2,59 +2,26 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_constants.dart';
 import '../core/state/driver_location_controller.dart';
 
-/// A banner widget for the driver's screen indicating the real-time location publishing status.
-class LocationSharingStatusBanner extends StatefulWidget {
-  final String activeRideId;
+/// A banner widget showing real-time location-publishing status.
+///
+/// In PR 38 the lifecycle is owned by [DriverActiveRideScreen] via an
+/// injected [DriverLocationController].  The banner is purely presentational
+/// — it does NOT create or auto-start a controller.
+class LocationSharingStatusBanner extends StatelessWidget {
+  /// The controller whose state this banner reflects.
+  final DriverLocationController controller;
 
   const LocationSharingStatusBanner({
     super.key,
-    required this.activeRideId,
+    required this.controller,
   });
-
-  @override
-  State<LocationSharingStatusBanner> createState() => _LocationSharingStatusBannerState();
-}
-
-class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanner> {
-  late final DriverLocationController _controller;
-
-  void _onStateChanged() => setState(() {});
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = DriverLocationController(rideId: widget.activeRideId);
-    _controller.addListener(_onStateChanged);
-    
-    // Auto-start sharing if allowed
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller.startPublishing();
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant LocationSharingStatusBanner oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.activeRideId != widget.activeRideId) {
-      // Typically the UI would remount, but just in case:
-      _controller.stopPublishing();
-      // Should recreate controller for new rideId, but for simplicity we assume it remounts
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onStateChanged);
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: _controller,
+      listenable: controller,
       builder: (context, _) {
-        final state = _controller.state;
+        final state = controller.state;
         final theme = Theme.of(context);
 
         Color backgroundColor = theme.colorScheme.surfaceContainerHighest;
@@ -65,10 +32,6 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
 
         if (state.isInitial) {
           message = 'Location sharing stopped.';
-          actionButton = TextButton(
-            onPressed: _controller.startPublishing,
-            child: const Text('Start'),
-          );
         } else if (state.isLoading) {
           icon = Icons.gps_fixed_rounded;
           message = state.message ?? 'Acquiring location...';
@@ -78,7 +41,7 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
           icon = Icons.my_location_rounded;
           message = 'Sharing live location with rider';
           actionButton = TextButton(
-            onPressed: _controller.stopPublishing,
+            onPressed: controller.stopPublishing,
             child: Text('Stop', style: TextStyle(color: foregroundColor)),
           );
         } else if (state.isError) {
@@ -87,13 +50,14 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
           icon = Icons.location_disabled_rounded;
           message = state.message ?? 'Location unavailable';
           actionButton = TextButton(
-            onPressed: _controller.startPublishing,
+            onPressed: controller.startPublishing,
             child: Text('Retry', style: TextStyle(color: foregroundColor)),
           );
         }
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppConstants.spaceM, vertical: AppConstants.spaceS),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.spaceM, vertical: AppConstants.spaceS),
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(AppConstants.radiusM),
@@ -121,7 +85,7 @@ class _LocationSharingStatusBannerState extends State<LocationSharingStatusBanne
                   ),
                 ),
               ),
-              ?actionButton,
+              if (actionButton != null) actionButton,
             ],
           ),
         );
