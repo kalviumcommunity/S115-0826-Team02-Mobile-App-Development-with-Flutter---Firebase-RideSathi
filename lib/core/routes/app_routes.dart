@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/state/auth_controller.dart';
 import '../../models/user_model.dart';
+import '../../models/ride_model.dart';
 import '../../screens/auth/driver_signup_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
@@ -15,6 +16,7 @@ import '../../screens/rider/ride_status_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/rider/rider_ride_history_screen.dart';
 import '../../screens/dispatch/driver_data_validation_screen.dart';
+import '../../screens/dispatch/candidate_validation_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
 import '../state/location_selection_controller.dart';
@@ -55,6 +57,7 @@ class AppRoutes {
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
   static const String dispatcherDriverData = '/dispatcher/driver-data';
+  static const String dispatcherCandidates = '/dispatcher/candidates';
 
   /// Generates application routes based on [RouteSettings] with route protection.
   static Route<dynamic> generateRoute(
@@ -366,6 +369,28 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => const DriverDataValidationScreen(),
+          settings: settings,
+        );
+
+      case dispatcherCandidates:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole != UserRole.dispatcher && userRole != UserRole.admin) {
+          return _buildAccessErrorRoute(
+            settings,
+            'Unauthorized. Dispatcher access required.',
+          );
+        }
+        final ride = settings.arguments as RideModel?;
+        if (ride == null) {
+          return _buildAccessErrorRoute(settings, 'Missing Ride context for candidates.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => CandidateValidationScreen(ride: ride),
           settings: settings,
         );
 
