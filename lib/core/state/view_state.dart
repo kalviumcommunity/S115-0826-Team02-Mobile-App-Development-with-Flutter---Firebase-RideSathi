@@ -79,6 +79,8 @@ class ViewState<T> {
   bool get isSuccess => status == ViewStatus.success;
   bool get isEmpty => status == ViewStatus.empty;
   bool get isError => status == ViewStatus.error;
+  /// Alias for [isError] — convenience getter for test readability.
+  bool get hasError => isError;
   bool get hasData => data != null;
 
   /// Pattern matching helper for exhaustive UI state handling.
