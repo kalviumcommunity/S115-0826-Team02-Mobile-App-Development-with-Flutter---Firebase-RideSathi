@@ -98,6 +98,12 @@ class StatusBadge extends StatelessWidget {
           icon: Icons.assignment_ind_rounded,
         );
 
+      case 'arrived':
+        return const _StatusStyleInfo(
+          color: Color(0xFF2563EB), // Royal Blue — driver at pickup
+          icon: Icons.location_on_rounded,
+        );
+
       case 'driver en route':
       case 'en route':
         return const _StatusStyleInfo(
@@ -107,6 +113,7 @@ class StatusBadge extends StatelessWidget {
 
       case 'picked up':
       case 'in progress':
+      case 'inprogress':
       case 'ongoing':
       case 'active':
         return const _StatusStyleInfo(
