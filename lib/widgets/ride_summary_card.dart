@@ -29,6 +29,9 @@ class RideSummaryCard extends StatelessWidget {
   /// Optional callback when the card is tapped.
   final VoidCallback? onTap;
 
+  /// Optional action button to display at the bottom of the card.
+  final Widget? actionButton;
+
   const RideSummaryCard({
     super.key,
     required this.pickupAddress,
@@ -39,6 +42,7 @@ class RideSummaryCard extends StatelessWidget {
     this.vehicleInfo,
     this.fare,
     this.onTap,
+    this.actionButton,
   });
 
   @override
@@ -163,6 +167,10 @@ class RideSummaryCard extends StatelessWidget {
                 ],
               ),
             ),
+          ],
+          if (actionButton != null) ...[
+            const SizedBox(height: AppConstants.spaceM),
+            actionButton!,
           ],
         ],
       ),
