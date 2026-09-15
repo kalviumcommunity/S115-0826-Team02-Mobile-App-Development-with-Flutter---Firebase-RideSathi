@@ -4,6 +4,7 @@ import '../../models/user_model.dart';
 import '../../screens/auth/driver_signup_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
+import '../../screens/driver/driver_active_ride_screen.dart';
 import '../../screens/driver/driver_home_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/profile/profile_screen.dart';
@@ -34,6 +35,9 @@ class AppRoutes {
   // Role-Specific Authenticated Routes
   static const String riderHome = '/rider/home';
   static const String driverHome = '/driver/home';
+
+  // Driver Workflow Routes
+  static const String driverActiveRide = '/driver/active-ride';
 
   // Authenticated Profile Routes
   static const String profile = '/profile';
@@ -136,6 +140,33 @@ class AppRoutes {
             builder: (_) => DriverHomeScreen(
               authController: controller,
               user: userFromArgs,
+            ),
+            settings: settings,
+          );
+        }
+        return _buildAccessErrorRoute(settings, 'Unsupported or unrecognized role.');
+
+      case driverActiveRide:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.rider) {
+          // Cross-role protection: Rider attempting Driver Active Ride
+          return MaterialPageRoute(
+            builder: (_) => RiderHomeScreen(
+              authController: controller,
+              user: userFromArgs,
+            ),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.driver) {
+          return MaterialPageRoute(
+            builder: (_) => DriverActiveRideScreen(
+              authController: controller,
             ),
             settings: settings,
           );
@@ -424,6 +455,11 @@ class AppNavigator {
       (route) => false,
       arguments: user,
     );
+  }
+
+  /// Navigates to the Driver Active Ride screen.
+  static Future<void> toDriverActiveRide(BuildContext context) {
+    return pushNamed(context, AppRoutes.driverActiveRide);
   }
 
   /// Navigates to the Driver Home screen, clearing the entire back stack.
