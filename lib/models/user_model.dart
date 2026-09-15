@@ -28,6 +28,8 @@ class UserModel {
   final UserRole role;
   final bool isUnionVerified;
   final String? vehicleInfo;
+  final bool isOnline;
+  final DateTime? availabilityUpdatedAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -39,6 +41,8 @@ class UserModel {
     required this.role,
     this.isUnionVerified = false,
     this.vehicleInfo,
+    this.isOnline = false,
+    this.availabilityUpdatedAt,
     required this.createdAt,
     this.updatedAt,
   });
@@ -52,6 +56,8 @@ class UserModel {
       'role': role.name,
       'isUnionVerified': isUnionVerified,
       'vehicleInfo': vehicleInfo,
+      'isOnline': isOnline,
+      if (availabilityUpdatedAt != null) 'availabilityUpdatedAt': availabilityUpdatedAt!.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
@@ -73,11 +79,17 @@ class UserModel {
       role: parsedRole,
       isUnionVerified: map['isUnionVerified'] as bool? ?? false,
       vehicleInfo: map['vehicleInfo'] as String?,
+      isOnline: map['isOnline'] as bool? ?? false,
+      availabilityUpdatedAt: map['availabilityUpdatedAt'] != null
+          ? (map['availabilityUpdatedAt'] is String
+              ? DateTime.tryParse(map['availabilityUpdatedAt'] as String)
+              : null)
+          : null,
       createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'] as String)
+          ? (map['createdAt'] is String ? DateTime.parse(map['createdAt'] as String) : DateTime.now())
           : DateTime.now(),
       updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'] as String)
+          ? (map['updatedAt'] is String ? DateTime.tryParse(map['updatedAt'] as String) : null)
           : null,
     );
   }
@@ -90,6 +102,8 @@ class UserModel {
     UserRole? role,
     bool? isUnionVerified,
     String? vehicleInfo,
+    bool? isOnline,
+    DateTime? availabilityUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -101,6 +115,8 @@ class UserModel {
       role: role ?? this.role,
       isUnionVerified: isUnionVerified ?? this.isUnionVerified,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
+      isOnline: isOnline ?? this.isOnline,
+      availabilityUpdatedAt: availabilityUpdatedAt ?? this.availabilityUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
