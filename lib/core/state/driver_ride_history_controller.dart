@@ -6,7 +6,7 @@ import '../../services/firestore_exception.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
-class RiderRideHistoryController extends ChangeNotifier {
+class DriverRideHistoryController extends ChangeNotifier {
   final RideService _rideService;
   final AuthController _authController;
 
@@ -19,7 +19,7 @@ class RiderRideHistoryController extends ChangeNotifier {
   bool _isLoadingMore = false;
   RideStatus? _currentStatusFilter;
 
-  RiderRideHistoryController({
+  DriverRideHistoryController({
     RideService? rideService,
     AuthController? authController,
   })  : _rideService = rideService ?? RideService(),
@@ -33,7 +33,6 @@ class RiderRideHistoryController extends ChangeNotifier {
   Future<void> loadHistory({bool refresh = false, RideStatus? status}) async {
     if (_isDisposed) return;
     
-    // If it's a new status filter, force refresh
     if (status != _currentStatusFilter) {
       _currentStatusFilter = status;
       refresh = true;
@@ -59,7 +58,7 @@ class RiderRideHistoryController extends ChangeNotifier {
     final currentGeneration = _authController.sessionGeneration;
 
     try {
-      final page = await _rideService.getRiderRideHistory(
+      final page = await _rideService.getDriverRideHistory(
         currentUser.id,
         limit: 20,
         startAfter: _lastDoc,
@@ -75,7 +74,7 @@ class RiderRideHistoryController extends ChangeNotifier {
       } else {
         _rides.addAll(page.rides);
         _lastDoc = page.lastDocument;
-        _hasMore = page.rides.length == 20; // Assuming limit is 20
+        _hasMore = page.rides.length == 20; 
       }
 
       _isLoadingMore = false;
