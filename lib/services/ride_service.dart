@@ -198,12 +198,12 @@ class RideService {
     }
   }
 
-  /// Atomically accepts a ride request on behalf of a driver.
+  /// Atomically assigns a driver to a requested ride.
   /// 
-  /// The [driverId] must match the currently authenticated driver's ID.
-  /// Throws a [FirestoreException] if the ride doesn't exist, is already accepted,
-  /// or belongs to someone else.
-  Future<void> acceptRide(String rideId, String driverId) async {
+  /// Serves as the authoritative shared primitive for both manual driver
+  /// acceptance and dispatcher automatic assignment.
+  /// Validates both the ride state and the driver's availability atomically.
+  Future<void> _assignDriverAtomically(String rideId, String driverId) async {
     if (rideId.trim().isEmpty) {
       throw ArgumentError('Ride ID cannot be empty.');
     }
@@ -213,8 +213,20 @@ class RideService {
 
     try {
       final docRef = _rides.doc(rideId.trim());
+      final userRef = _firestore.collection('users').doc(driverId.trim());
 
       await _firestore.runTransaction((transaction) async {
+        // Read user document for cross-document validation
+        final userSnap = await transaction.get(userRef);
+        if (!userSnap.exists) {
+          throw const FirestoreException('Driver profile not found.', code: 'not-found');
+        }
+        
+        final userData = userSnap.data();
+        if (userData == null || userData['isOnline'] != true) {
+           throw const FirestoreException('Driver is no longer online.', code: 'unavailable');
+        }
+
         final snapshot = await transaction.get(docRef);
 
         if (!snapshot.exists) {
@@ -253,6 +265,17 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
+
+  /// Atomically accepts a ride request on behalf of a driver.
+  Future<void> acceptRide(String rideId, String driverId) async {
+    return _assignDriverAtomically(rideId, driverId);
+  }
+
+  /// Atomically assigns a driver to a ride via the dispatcher system.
+  Future<void> assignRide(String rideId, String driverId) async {
+    return _assignDriverAtomically(rideId, driverId);
+  }
+
 
   /// Atomically times out a ride request.
   /// 
