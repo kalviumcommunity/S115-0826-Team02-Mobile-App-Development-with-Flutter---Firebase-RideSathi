@@ -12,20 +12,23 @@ import 'package:ridesathi/services/ride_service.dart';
 class MockLocationProvider implements LocationProvider {
   LocationPermissionState permissionResult = LocationPermissionState.granted;
   bool isEnabled = true;
-  final StreamController<DriverLocation> streamController = StreamController<DriverLocation>.broadcast();
+  final StreamController<DriverLocation> streamController =
+      StreamController<DriverLocation>.broadcast();
 
   @override
   Future<LocationPermissionState> checkPermission() async => permissionResult;
 
   @override
-  Future<LocationPermissionState> requestPermission() async => permissionResult;
+  Future<LocationPermissionState> requestPermission() async =>
+      permissionResult;
 
   @override
   Stream<DriverLocation> getPositionStream() => streamController.stream;
 }
 
 class MockRideService implements RideService {
-  final StreamController<RideModel?> streamController = StreamController<RideModel?>.broadcast();
+  final StreamController<RideModel?> streamController =
+      StreamController<RideModel?>.broadcast();
   int updateCallCount = 0;
   bool throwOnUpdate = false;
 
@@ -33,20 +36,25 @@ class MockRideService implements RideService {
   Stream<RideModel?> watchRide(String rideId) => streamController.stream;
 
   @override
-  Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) async {
+  Future<void> updateDriverLocation(
+      String rideId, DriverLocation location, String driverId) async {
     if (throwOnUpdate) throw Exception('Firebase error');
     updateCallCount++;
   }
 
   // Unimplemented methods
   @override
-  Future<RideModel> createRideRequest(dynamic draft, String riderId) => throw UnimplementedError();
+  Future<RideModel> createRideRequest(dynamic draft, String riderId) =>
+      throw UnimplementedError();
 
   @override
-  Future<void> cancelRide(String rideId, String riderId) => throw UnimplementedError();
+  Future<void> cancelRide(String rideId, String riderId) =>
+      throw UnimplementedError();
 
   @override
-  Future<void> updateRideStatus(String rideId, RideStatus status) => throw UnimplementedError();
+  Future<List<RideModel>> getRiderRideHistory(String riderId,
+          {int limit = 20}) =>
+      throw UnimplementedError();
 }
 
 class MockAuthController extends AuthController {
@@ -72,9 +80,17 @@ void main() {
 
     final testDriver = UserModel(
       id: 'driver_123',
-      name: 'Test',
+      name: 'Test Driver',
       phoneNumber: '1234',
       role: UserRole.driver,
+      createdAt: DateTime.now(),
+    );
+
+    final testRider = UserModel(
+      id: 'rider_123',
+      name: 'Test Rider',
+      phoneNumber: '5678',
+      role: UserRole.rider,
       createdAt: DateTime.now(),
     );
 
@@ -96,14 +112,15 @@ void main() {
       expect(controller.state.isInitial, isTrue);
     });
 
-    test('Starts publishing when permission is granted and driver is logged in', () async {
+    test('Starts publishing when permission is granted and driver is logged in',
+        () async {
       await controller.startPublishing();
       expect(controller.state.isSuccess, isTrue);
-      
-      final loc = DriverLocation(latitude: 10.0, longitude: 20.0, updatedAt: DateTime.now());
+
+      final loc = DriverLocation(
+          latitude: 10.0, longitude: 20.0, updatedAt: DateTime.now());
       mockLocation.streamController.add(loc);
-      
-      // Allow async update to run
+
       await Future.delayed(const Duration(milliseconds: 50));
       expect(mockRideService.updateCallCount, equals(1));
     });
@@ -115,16 +132,38 @@ void main() {
       expect(controller.state.message, contains('permission is required'));
     });
 
+    test('Rejects location publishing for rider account', () async {
+      authController.setMockUser(testRider);
+      await controller.startPublishing();
+
+      expect(controller.state.isError, isTrue);
+      expect(controller.state.message, contains('Only authenticated driver'));
+    });
+
+    test('Rejects location publishing for empty ride ID', () async {
+      final emptyRideCtrl = DriverLocationController(
+        rideId: '',
+        rideService: mockRideService,
+        locationProvider: mockLocation,
+        authController: authController,
+      );
+
+      await emptyRideCtrl.startPublishing();
+      expect(emptyRideCtrl.state.isError, isTrue);
+      expect(emptyRideCtrl.state.message, contains('Invalid or empty ride ID'));
+    });
+
     test('Stops publishing when ride is completed', () async {
       await controller.startPublishing();
       expect(controller.state.isSuccess, isTrue);
-      
+
       final completedRide = RideModel(
         id: 'ride_123',
         riderId: 'rider',
         driverId: 'driver_123',
         pickup: const LocationModel(id: '', displayName: '', address: ''),
-        destination: const LocationModel(id: '', displayName: '', address: ''),
+        destination:
+            const LocationModel(id: '', displayName: '', address: ''),
         vehicleType: VehicleType.autoRickshaw,
         status: RideStatus.completed,
         estimatedFare: 100,
@@ -134,17 +173,17 @@ void main() {
 
       mockRideService.streamController.add(completedRide);
       await Future.delayed(const Duration(milliseconds: 50));
-      
+
       expect(controller.state.isInitial, isTrue);
     });
 
     test('Stops publishing when user logs out', () async {
       await controller.startPublishing();
       expect(controller.state.isSuccess, isTrue);
-      
+
       authController.setMockUser(null);
       await Future.delayed(const Duration(milliseconds: 50));
-      
+
       expect(controller.state.isInitial, isTrue);
     });
   });

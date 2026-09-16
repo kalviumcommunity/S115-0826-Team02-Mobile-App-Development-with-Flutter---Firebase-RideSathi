@@ -12,8 +12,10 @@ class DriverLocation {
     required this.latitude,
     required this.longitude,
     required this.updatedAt,
-  })  : assert(latitude >= -90 && latitude <= 90, 'Latitude must be between -90 and 90'),
-        assert(longitude >= -180 && longitude <= 180, 'Longitude must be between -180 and 180');
+  })  : assert(latitude >= -90 && latitude <= 90,
+            'Latitude must be between -90 and 90'),
+        assert(longitude >= -180 && longitude <= 180,
+            'Longitude must be between -180 and 180');
 
   /// Validates the location fields gracefully returning true if valid.
   bool get isValid {
@@ -46,11 +48,30 @@ class DriverLocation {
   }
 
   factory DriverLocation.fromMap(Map<String, dynamic> map) {
-    final lat = (map['latitude'] as num?)?.toDouble() ?? 0.0;
-    final lon = (map['longitude'] as num?)?.toDouble() ?? 0.0;
-    
+    final latNum = map['latitude'] as num?;
+    final lonNum = map['longitude'] as num?;
+
+    if (latNum == null || lonNum == null) {
+      throw const FormatException(
+          'Missing latitude or longitude in DriverLocation map.');
+    }
+
+    final lat = latNum.toDouble();
+    final lon = lonNum.toDouble();
+
+    if (lat.isNaN || lat.isInfinite || lat < -90 || lat > 90) {
+      throw FormatException('Invalid latitude value: $lat');
+    }
+    if (lon.isNaN || lon.isInfinite || lon < -180 || lon > 180) {
+      throw FormatException('Invalid longitude value: $lon');
+    }
+
     final updateVal = map['updatedAt'];
-    final time = updateVal is Timestamp ? updateVal.toDate() : DateTime.now();
+    final time = updateVal is Timestamp
+        ? updateVal.toDate()
+        : (updateVal is String
+            ? (DateTime.tryParse(updateVal) ?? DateTime.now())
+            : DateTime.now());
 
     return DriverLocation(
       latitude: lat,
