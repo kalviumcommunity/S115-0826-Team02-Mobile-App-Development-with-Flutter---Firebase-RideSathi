@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 class DriverLocation {
   final double latitude;
   final double longitude;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
 
   const DriverLocation({
     required this.latitude,
     required this.longitude,
-    required this.updatedAt,
+    this.updatedAt,
   })  : assert(latitude >= -90 && latitude <= 90,
             'Latitude must be between -90 and 90'),
         assert(longitude >= -180 && longitude <= 180,
@@ -32,7 +32,7 @@ class DriverLocation {
     return other is DriverLocation &&
         other.latitude == latitude &&
         other.longitude == longitude &&
-        other.updatedAt.isAtSameMomentAs(updatedAt);
+        other.updatedAt == updatedAt;
   }
 
   @override
@@ -42,8 +42,8 @@ class DriverLocation {
     return {
       'latitude': latitude,
       'longitude': longitude,
-      // Uses server timestamp to ensure the timestamp reflects the moment it reached the server
-      'updatedAt': FieldValue.serverTimestamp(),
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
+      // Note: service layer overrides with serverTimestamp() during updates
     };
   }
 
@@ -67,11 +67,9 @@ class DriverLocation {
     }
 
     final updateVal = map['updatedAt'];
-    final time = updateVal is Timestamp
+    final DateTime? time = updateVal is Timestamp
         ? updateVal.toDate()
-        : (updateVal is String
-            ? (DateTime.tryParse(updateVal) ?? DateTime.now())
-            : DateTime.now());
+        : (updateVal is String ? DateTime.tryParse(updateVal) : null);
 
     return DriverLocation(
       latitude: lat,

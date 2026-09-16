@@ -34,11 +34,14 @@ class RideService {
         vehicleType: VehicleType.autoRickshaw, // Default for now
         status: RideStatus.requested,
         estimatedFare: 150.0, // Default for now
-        createdAt: DateTime.now(), // Will be overridden by serverTimestamp in toMap
-        updatedAt: DateTime.now(),
+        // Model layer doesn't dictate timestamp anymore
       );
 
-      await docRef.set(rideToSave.toMap());
+      final payload = rideToSave.toMap();
+      payload['createdAt'] = FieldValue.serverTimestamp();
+      payload['updatedAt'] = FieldValue.serverTimestamp();
+
+      await docRef.set(payload);
 
       return rideToSave;
     } catch (e) {

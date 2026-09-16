@@ -26,19 +26,20 @@ enum VehicleType {
 class RideFeedback {
   final int rating;
   final String? comment;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   const RideFeedback({
     required this.rating,
     this.comment,
-    required this.createdAt,
+    this.createdAt,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'rating': rating,
       if (comment != null) 'comment': comment,
-      'createdAt': FieldValue.serverTimestamp(),
+      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
+      // note: typically the service layer injects FieldValue.serverTimestamp() during writes.
     };
   }
 
@@ -47,7 +48,7 @@ class RideFeedback {
     return RideFeedback(
       rating: map['rating'] as int? ?? 5,
       comment: map['comment'] as String?,
-      createdAt: createVal is Timestamp ? createVal.toDate() : DateTime.now(),
+      createdAt: createVal is Timestamp ? createVal.toDate() : null,
     );
   }
 }
@@ -64,8 +65,8 @@ class RideModel {
   final RideStatus status;
   final double estimatedFare;
   final RideFeedback? feedback;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const RideModel({
     required this.id,
@@ -75,11 +76,11 @@ class RideModel {
     required this.pickup,
     required this.destination,
     required this.vehicleType,
-    required this.status,
+    this.status = RideStatus.requested,
     required this.estimatedFare,
     this.feedback,
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt,
+    this.updatedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -94,8 +95,8 @@ class RideModel {
       'status': status.name,
       'estimatedFare': estimatedFare,
       if (feedback != null) 'feedback': feedback!.toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };
   }
 
@@ -124,8 +125,8 @@ class RideModel {
       feedback: map['feedback'] != null
           ? RideFeedback.fromMap(map['feedback'] as Map<String, dynamic>)
           : null,
-      createdAt: createVal is Timestamp ? createVal.toDate() : DateTime.now(),
-      updatedAt: updateVal is Timestamp ? updateVal.toDate() : DateTime.now(),
+      createdAt: createVal is Timestamp ? createVal.toDate() : null,
+      updatedAt: updateVal is Timestamp ? updateVal.toDate() : null,
     );
   }
 }
