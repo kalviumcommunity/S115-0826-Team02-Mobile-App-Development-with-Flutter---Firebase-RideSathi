@@ -242,10 +242,55 @@ class RideService {
           }
         }
 
-        // Perform the atomic update
         transaction.update(docRef, {
           'status': RideStatus.accepted.name,
           'driverId': driverId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
+
+  /// Atomically times out a ride request.
+  /// 
+  /// The ride must be in the `requested` state. If the ride has already been
+  /// accepted, cancelled, or transitioned to any other state, this acts as a safe no-op.
+  /// Throws a [FirestoreException] on failure.
+  Future<void> timeoutRide(String rideId) async {
+    if (rideId.trim().isEmpty) {
+      throw ArgumentError('Ride ID cannot be empty.');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          throw const FirestoreException('Ride not found.', code: 'not-found');
+        }
+
+        final data = snapshot.data();
+        if (data == null) {
+          throw const FirestoreException('Ride data is corrupted.', code: 'data-corrupted');
+        }
+
+        // Validate Status transition: only 'requested' is allowed.
+        // If it's not requested, it's a race condition where another actor
+        // (e.g., driver accepting, rider cancelling) already transitioned it.
+        // We safely abort the transaction without throwing an error (no-op).
+        final currentStatusStr = data['status'] as String?;
+        if (currentStatusStr != RideStatus.requested.name) {
+          return; // No-op, safely ignore
+        }
+
+        // Perform the atomic update
+        transaction.update(docRef, {
+          'status': RideStatus.timedOut.name,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });

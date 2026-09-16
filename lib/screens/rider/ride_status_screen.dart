@@ -116,6 +116,10 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         statusMessage = 'This ride was cancelled.';
         statusDescription = 'You can request a new ride from the home screen.';
         break;
+      case RideStatus.timedOut:
+        statusMessage = 'Ride Request Timed Out';
+        statusDescription = 'No driver accepted this request within the allowed time. You can request another ride.';
+        break;
     }
 
     return Padding(
@@ -193,6 +197,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             listenable: _cancellationController,
             builder: (context, _) {
               final isLoading = _cancellationController.state.isLoading;
+              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled || ride.status == RideStatus.timedOut;
               final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled;
               final actionTheme = Theme.of(context);
 

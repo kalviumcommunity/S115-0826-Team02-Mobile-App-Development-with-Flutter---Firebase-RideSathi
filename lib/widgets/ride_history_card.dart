@@ -62,7 +62,7 @@ class RideHistoryCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  StatusBadge(status: ride.status),
+                  StatusBadge(status: ride.status.name),
                   Text(
                     '₹${ride.estimatedFare.toStringAsFixed(0)}',
                     style: theme.textTheme.titleMedium?.copyWith(

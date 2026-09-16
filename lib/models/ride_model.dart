@@ -11,6 +11,7 @@ enum RideStatus {
   inProgress,
   completed,
   cancelled,
+  timedOut,
 }
 
 /// Represents the vehicle type in regional cab/auto union.

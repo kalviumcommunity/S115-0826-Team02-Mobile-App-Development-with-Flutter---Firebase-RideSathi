@@ -142,6 +142,13 @@ class StatusBadge extends StatelessWidget {
           icon: Icons.close_rounded,
         );
 
+      case 'timedout':
+      case 'timed out':
+        return const _StatusStyleInfo(
+          color: Color(0xFF9CA3AF), // Cool Gray
+          icon: Icons.timer_off_rounded,
+        );
+
       case 'no show':
       case 'no_show':
         return const _StatusStyleInfo(
