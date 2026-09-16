@@ -26,13 +26,26 @@ class DriverDataService {
   /// Aggregates profile availability data with current active ride location data.
   /// Throws [FirestoreException] on stream failure.
   Stream<List<DriverOperationalData>> watchOnlineDriversData() {
+    return _watchDriversData(onlyOnline: true);
+  }
+
+  /// Streams real-time operational data for all drivers (online and offline).
+  ///
+  /// Aggregates profile availability data with current active ride location data.
+  /// Throws [FirestoreException] on stream failure.
+  Stream<List<DriverOperationalData>> watchAllDriversData() {
+    return _watchDriversData(onlyOnline: false);
+  }
+
+  Stream<List<DriverOperationalData>> _watchDriversData({required bool onlyOnline}) {
     try {
-      // 1. Stream users where role == 'driver' and isOnline == true
-      return _usersCollection
-          .where('role', isEqualTo: UserRole.driver.name)
-          .where('isOnline', isEqualTo: true)
-          .snapshots()
-          .switchMap((snapshot) {
+      var query = _usersCollection.where('role', isEqualTo: UserRole.driver.name);
+      
+      if (onlyOnline) {
+        query = query.where('isOnline', isEqualTo: true);
+      }
+
+      return query.snapshots().switchMap((snapshot) {
         if (snapshot.docs.isEmpty) {
           return Stream.value(<DriverOperationalData>[]);
         }

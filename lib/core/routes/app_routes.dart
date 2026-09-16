@@ -17,6 +17,7 @@ import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/rider/rider_ride_history_screen.dart';
 import '../../screens/dispatch/driver_data_validation_screen.dart';
 import '../../screens/dispatch/candidate_validation_screen.dart';
+import '../../screens/dispatch/dispatcher_home_screen.dart';
 import '../../screens/rider/ride_feedback_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
@@ -377,9 +378,24 @@ class AppRoutes {
         );
 
       case dispatcherHome:
-        return _buildAccessErrorRoute(
-          settings,
-          'Dispatcher console is reserved for upcoming roadmap milestones.',
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole != UserRole.dispatcher && userRole != UserRole.admin) {
+          return _buildAccessErrorRoute(
+            settings,
+            'Unauthorized. Dispatcher access required.',
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => DispatcherHomeScreen(
+            authController: controller,
+            user: userFromArgs,
+          ),
+          settings: settings,
         );
 
       case dispatcherDriverData:
@@ -413,12 +429,28 @@ class AppRoutes {
             'Unauthorized. Dispatcher access required.',
           );
         }
-        final ride = settings.arguments as RideModel?;
+        RideModel? ride;
+        bool isReassignment = false;
+        String? currentDriverId;
+        
+        if (settings.arguments is RideModel) {
+          ride = settings.arguments as RideModel;
+        } else if (settings.arguments is Map) {
+          final args = settings.arguments as Map<String, dynamic>;
+          ride = args['ride'] as RideModel?;
+          isReassignment = args['isReassignment'] as bool? ?? false;
+          currentDriverId = args['currentDriverId'] as String?;
+        }
+
         if (ride == null) {
           return _buildAccessErrorRoute(settings, 'Missing Ride context for candidates.');
         }
         return MaterialPageRoute(
-          builder: (_) => CandidateValidationScreen(ride: ride),
+          builder: (_) => CandidateValidationScreen(
+            ride: ride!,
+            isReassignment: isReassignment,
+            currentDriverId: currentDriverId,
+          ),
           settings: settings,
         );
 
@@ -512,12 +544,25 @@ class AppNavigator {
     final role = user?.role ?? AuthController.instance.currentUser?.role;
 
     switch (role) {
+      case UserRole.dispatcher:
+      case UserRole.admin:
+        return toDispatcherHome(context, user);
       case UserRole.driver:
         return toDriverHome(context, user);
       case UserRole.rider:
       default:
         return toRiderHome(context, user);
     }
+  }
+
+  /// Navigates to the Dispatcher Home screen, clearing the entire back stack.
+  static Future<void> toDispatcherHome(BuildContext context, [UserModel? user]) {
+    return pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.dispatcherHome,
+      (route) => false,
+      arguments: user,
+    );
   }
 
   /// Navigates to the Rider Home screen, clearing the entire back stack.
