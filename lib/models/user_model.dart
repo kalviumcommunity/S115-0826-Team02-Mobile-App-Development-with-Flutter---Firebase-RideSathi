@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// Represents the user role within the RideSathi ecosystem.
 enum UserRole {
   rider,
@@ -83,6 +85,10 @@ class UserModel {
     final rawOnline = map['isOnline'];
     final bool parsedOnline = rawOnline is bool ? rawOnline : false;
 
+    final availVal = map['availabilityUpdatedAt'];
+    final createVal = map['createdAt'];
+    final updateVal = map['updatedAt'];
+
     return UserModel(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
@@ -94,17 +100,9 @@ class UserModel {
       vehicleInfo: map['vehicleInfo'] as String?,
       profileImageUrl: map['profileImageUrl'] as String?,
       driverDocumentUrl: map['driverDocumentUrl'] as String?,
-      availabilityUpdatedAt: map['availabilityUpdatedAt'] != null
-          ? (map['availabilityUpdatedAt'] is String
-              ? DateTime.tryParse(map['availabilityUpdatedAt'] as String)
-              : null)
-          : null,
-      createdAt: map['createdAt'] != null
-          ? (map['createdAt'] is String ? DateTime.tryParse(map['createdAt'] as String) : null)
-          : null,
-      updatedAt: map['updatedAt'] != null
-          ? (map['updatedAt'] is String ? DateTime.tryParse(map['updatedAt'] as String) : null)
-          : null,
+      availabilityUpdatedAt: availVal is Timestamp ? availVal.toDate() : (availVal is String ? DateTime.tryParse(availVal) : null),
+      createdAt: createVal is Timestamp ? createVal.toDate() : (createVal is String ? DateTime.tryParse(createVal) : null),
+      updatedAt: updateVal is Timestamp ? updateVal.toDate() : (updateVal is String ? DateTime.tryParse(updateVal) : null),
     );
   }
 
