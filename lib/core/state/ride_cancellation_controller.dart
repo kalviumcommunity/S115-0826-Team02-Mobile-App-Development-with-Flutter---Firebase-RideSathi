@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../services/firestore_exception.dart';
 import '../../services/ride_service.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
@@ -39,16 +40,20 @@ class RideCancellationController extends ChangeNotifier {
 
     _setState(const ViewState.loading());
 
+    final currentGeneration = _authController.sessionGeneration;
+
     try {
       await _rideService.cancelRide(rideId, riderId);
       
-      if (_isDisposed) return;
+      if (_isDisposed || _authController.sessionGeneration != currentGeneration) return;
       _setState(const ViewState.success(null));
       
+    } on FirestoreException catch (e) {
+      if (_isDisposed || _authController.sessionGeneration != currentGeneration) return;
+      _setState(ViewState.error(e.message));
     } catch (e) {
-      if (_isDisposed) return;
-      // We rely on the RideService/FirestoreException to provide user-friendly messages
-      _setState(ViewState.error(e.toString().replaceAll('Exception: ', '')));
+      if (_isDisposed || _authController.sessionGeneration != currentGeneration) return;
+      _setState(const ViewState.error('An unexpected error occurred. Please try again.'));
     }
   }
 

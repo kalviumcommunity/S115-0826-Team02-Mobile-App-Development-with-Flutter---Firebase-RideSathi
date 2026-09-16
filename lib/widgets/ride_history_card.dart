@@ -143,8 +143,54 @@ class RideHistoryCard extends StatelessWidget {
                     ),
                 ],
               ),
+              if (ride.status == RideStatus.completed) ...[
+                const SizedBox(height: AppConstants.spaceM),
+                _buildFeedbackAction(context, theme),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeedbackAction(BuildContext context, ThemeData theme) {
+    if (ride.feedback != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppConstants.radiusS),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              'Feedback Submitted (${ride.feedback!.rating} ★)',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.star_outline_rounded, size: 18),
+        label: const Text('Give Feedback'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: theme.colorScheme.primary,
+          side: BorderSide(color: theme.colorScheme.primary),
+          padding: const EdgeInsets.symmetric(vertical: 12),
         ),
       ),
     );

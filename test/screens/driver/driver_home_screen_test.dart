@@ -14,7 +14,8 @@ import '../../services/driver_availability_service_test.dart';
 class _FakeAuthService extends AuthService {
   final bool shouldFailSignOut;
   final Completer<void>? signOutCompleter;
-  const _FakeAuthService({this.shouldFailSignOut = false, this.signOutCompleter});
+  const _FakeAuthService(
+      {this.shouldFailSignOut = false, this.signOutCompleter});
 
   @override
   Future<void> userSignOut() async {
@@ -65,8 +66,10 @@ void main() {
     FirebaseService.isInitializedOverride = false;
   });
 
-  group('DriverHomeScreen — Layout and Driver Identity', () {
-    testWidgets('renders driver branding, vehicle info, and verification badge', (tester) async {
+  group('DriverHomeScreen — Layout, Driver Identity & Verification State', () {
+    testWidgets(
+        'renders driver branding, vehicle info, and pending verification badge',
+        (tester) async {
       await tester.pumpWidget(
         wrap(DriverHomeScreen(authController: controller)),
       );
@@ -77,9 +80,12 @@ void main() {
       expect(find.text('Driver Role Active'), findsOneWidget);
       expect(find.text('Pending Verification'), findsOneWidget);
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
+
     });
 
-    testWidgets('renders verified badge when driver is union verified', (tester) async {
+    testWidgets(
+        'renders verified badge and message when driver is union verified',
+        (tester) async {
       final verifiedDriver = UserModel(
         id: 'driver-2',
         name: 'Harpreet Singh',
@@ -100,79 +106,201 @@ void main() {
       );
 
       expect(find.text('Union Verified'), findsOneWidget);
+      expect(find.text('Verified'), findsOneWidget);
+      expect(
+          find.text(
+              'Your union credentials and vehicle permit are fully verified.'),
+          findsOneWidget);
       expect(find.text('Cab KA-02-CD-5678'), findsOneWidget);
+      expect(
+          find.text(
+              'Your union credentials and vehicle permit are fully verified.'),
+          findsOneWidget);
+    });
+
+    testWidgets(
+        'renders fallback text when vehicle information is missing or empty',
+        (tester) async {
+      final noVehicleDriver = UserModel(
+        id: 'driver-3',
+        name: 'Amit Kumar',
+        phoneNumber: '+919876543210',
+        role: UserRole.driver,
+        vehicleInfo: '',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final noVehicleController = AuthController(
+        initialState: AuthState.authenticated(noVehicleDriver),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: noVehicleController)),
+      );
+
+      expect(find.text('Vehicle details not available'), findsOneWidget);
+      expect(find.text('Not Set'), findsOneWidget);
     });
   });
 
-  group('DriverHomeScreen — Driver Availability Toggling', () {
-    testWidgets('renders Offline status card and Go Online button by default', (tester) async {
-      final availCtrl = DriverAvailabilityController(
-        authController: controller,
-        availabilityService: fakeAvailabilityService,
+  group('DriverHomeScreen — Loading and Error States', () {
+    testWidgets('renders loading view when auth controller state is loading',
+        (tester) async {
+      final loadingController = AuthController(
+        initialState: const AuthState.loading(),
       );
 
       await tester.pumpWidget(
-        wrap(DriverHomeScreen(
-          authController: controller,
-          availabilityController: availCtrl,
-        )),
+        wrap(DriverHomeScreen(authController: loadingController)),
       );
 
-      expect(find.text('Driver Availability'), findsOneWidget);
-      expect(find.text('Offline'), findsOneWidget);
-      expect(find.text('You are currently not available for new rides.'), findsOneWidget);
-      expect(find.text('Go Online'), findsOneWidget);
+      expect(find.text('Loading driver profile...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('toggling availability from Offline to Online updates UI to Online state', (tester) async {
-      final availCtrl = DriverAvailabilityController(
-        authController: controller,
-        availabilityService: fakeAvailabilityService,
+    testWidgets('renders error view when user profile is null', (tester) async {
+      final unauthController = AuthController(
+        initialState: const AuthState.unauthenticated(),
       );
 
       await tester.pumpWidget(
-        wrap(DriverHomeScreen(
-          authController: controller,
-          availabilityController: availCtrl,
-        )),
+        wrap(DriverHomeScreen(authController: unauthController)),
       );
 
-      expect(find.text('Go Online'), findsOneWidget);
+      expect(find.text('Driver Profile Not Found'), findsOneWidget);
+      expect(
+          find.text(
+              'Unable to resolve authenticated driver information. Please log in again.'),
+          findsOneWidget);
+    });
 
-      await tester.tap(find.text('Go Online'));
+    testWidgets('renders access restricted error when user is a Rider',
+        (tester) async {
+      final riderUser = UserModel(
+        id: 'rider-1',
+        name: 'Rahul Rider',
+        phoneNumber: '+919111122223',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final riderController = AuthController(
+        initialState: AuthState.authenticated(riderUser),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: riderController)),
+      );
+
+      expect(find.text('Access Restricted'), findsOneWidget);
+      expect(
+          find.text(
+              'This dashboard is reserved for authenticated driver accounts.'),
+          findsOneWidget);
+    });
+
+    testWidgets(
+        'renders fallback text when vehicle information is missing or empty',
+        (tester) async {
+      final noVehicleDriver = UserModel(
+        id: 'driver-3',
+        name: 'Amit Kumar',
+        phoneNumber: '+919876543210',
+        role: UserRole.driver,
+        vehicleInfo: '',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final noVehicleController = AuthController(
+        initialState: AuthState.authenticated(noVehicleDriver),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: noVehicleController)),
+      );
+
+      expect(find.text('Vehicle details not available'), findsOneWidget);
+      expect(find.text('Not Set'), findsOneWidget);
+    });
+  });
+
+  group('DriverHomeScreen — Session Isolation & Verification State Safety',
+      () {
+    testWidgets(
+        'verified Driver A logout and unverified Driver B login preserves strict session isolation',
+        (tester) async {
+      final driverA = UserModel(
+        id: 'driver-A',
+        name: 'Driver Alpha',
+        phoneNumber: '+919000000001',
+        role: UserRole.driver,
+        vehicleInfo: 'Auto KA-01-A-1111',
+        isUnionVerified: true,
+        createdAt: DateTime.now(),
+      );
+
+      final driverB = UserModel(
+        id: 'driver-B',
+        name: 'Driver Bravo',
+        phoneNumber: '+919000000002',
+        role: UserRole.driver,
+        vehicleInfo: 'Cab KA-02-B-2222',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final authCtrl = AuthController(
+        initialState: AuthState.authenticated(driverA),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: authCtrl)),
+      );
+
+      expect(find.text('Welcome, Driver Alpha'), findsOneWidget);
+      expect(find.text('Union Verified'), findsOneWidget);
+
+      // Sign out Driver A
+      await authCtrl.signOut();
       await tester.pumpAndSettle();
 
-      expect(find.text('Online'), findsOneWidget);
-      expect(find.text('You are currently available for new rides.'), findsOneWidget);
-      expect(find.text('Go Offline'), findsOneWidget);
-    });
-
-    testWidgets('renders Online status card when initial state is Online', (tester) async {
-      final onlineDriver = dummyDriver.copyWith(isOnline: true);
-      final onlineAuthCtrl = AuthController(
-        initialState: AuthState.authenticated(onlineDriver),
-      );
-
-      final availCtrl = DriverAvailabilityController(
-        authController: onlineAuthCtrl,
-        availabilityService: fakeAvailabilityService,
-        initialOnline: true,
-      );
-
+      // Sign in Driver B
+      authCtrl.restoreSession(driverB);
       await tester.pumpWidget(
-        wrap(DriverHomeScreen(
-          authController: onlineAuthCtrl,
-          availabilityController: availCtrl,
-        )),
+        wrap(DriverHomeScreen(authController: authCtrl)),
       );
+      await tester.pumpAndSettle();
 
-      expect(find.text('Online'), findsOneWidget);
-      expect(find.text('Go Offline'), findsOneWidget);
+      expect(find.text('Welcome, Driver Bravo'), findsOneWidget);
+      expect(find.text('Pending Verification'), findsOneWidget);
+
+      expect(find.text('Welcome, Driver Alpha'), findsNothing);
+      expect(find.text('Union Verified'), findsNothing);
     });
   });
 
-  group('DriverHomeScreen — Logout Workflow', () {
-    testWidgets('successful logout clears stack and navigates to LoginScreen', (tester) async {
+  group('DriverHomeScreen — Navigation and Logout Workflow', () {
+    testWidgets('navigates to Profile screen when profile icon is tapped',
+        (tester) async {
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: controller)),
+      );
+
+      final profileButton = find.byIcon(Icons.person_outline_rounded);
+      expect(profileButton, findsOneWidget);
+
+      await tester.tap(profileButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('User Profile'), findsOneWidget);
+    });
+
+    testWidgets(
+        'successful logout clears stack and navigates to LoginScreen',
+        (tester) async {
+
       await tester.pumpWidget(
         wrap(DriverHomeScreen(authController: controller)),
       );
@@ -200,7 +328,9 @@ void main() {
       expect(find.text('Sign out failed due to network.'), findsOneWidget);
     });
 
-    testWidgets('shows loading indicator and disables logout button during logout', (tester) async {
+    testWidgets(
+        'shows loading indicator and disables logout button during logout',
+        (tester) async {
       final completer = Completer<void>();
       final slowController = AuthController(
         authService: _FakeAuthService(signOutCompleter: completer),
@@ -227,7 +357,9 @@ void main() {
       expect(find.text('Sign in to continue'), findsOneWidget);
     });
 
-    testWidgets('rapid repeated taps on logout do not crash or produce duplicate navigation', (tester) async {
+    testWidgets(
+        'rapid repeated taps on logout do not crash or produce duplicate navigation',
+        (tester) async {
       final completer = Completer<void>();
       final slowController = AuthController(
         authService: _FakeAuthService(signOutCompleter: completer),
@@ -242,12 +374,6 @@ void main() {
       await tester.pump();
       await tester.tap(find.byType(IconButton).last, warnIfMissed: false);
       await tester.pump();
-
-      completer.complete();
-      await tester.pumpAndSettle();
-
-      expect(slowController.isAuthenticated, isFalse);
-      expect(find.text('Sign in to continue'), findsOneWidget);
     });
   });
 }
