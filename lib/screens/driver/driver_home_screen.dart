@@ -7,6 +7,7 @@ import '../../core/state/auth_controller.dart';
 import '../../core/state/incoming_ride_requests_controller.dart';
 import '../../core/state/ride_acceptance_controller.dart';
 import '../../core/state/ride_rejection_controller.dart';
+import '../../core/state/driver_availability_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../models/ride_model.dart';
 import '../../models/user_model.dart';
@@ -35,6 +36,9 @@ class DriverHomeScreen extends StatefulWidget {
   /// Optional [RideRejectionController] for dependency injection in tests.
   final RideRejectionController? rejectionController;
 
+  /// Optional [DriverAvailabilityController] for dependency injection in tests.
+  final DriverAvailabilityController? availabilityController;
+
   /// Optional [UserModel] for explicit user identity passing.
   final UserModel? user;
 
@@ -44,6 +48,7 @@ class DriverHomeScreen extends StatefulWidget {
     this.requestsController,
     this.acceptanceController,
     this.rejectionController,
+    this.availabilityController,
     this.user,
   });
 
@@ -56,6 +61,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final IncomingRideRequestsController _requestsController;
   late final RideAcceptanceController _acceptanceController;
   late final RideRejectionController _rejectionController;
+  late final DriverAvailabilityController _availabilityController;
   bool _isLoggingOut = false;
   bool _ownsRequestsController = false;
   bool _ownsAcceptanceController = false;
@@ -65,6 +71,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void initState() {
     super.initState();
     _authController = widget.authController ?? AuthController.instance;
+    
     if (widget.requestsController != null) {
       _requestsController = widget.requestsController!;
       _ownsRequestsController = false;
@@ -73,8 +80,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         authController: _authController,
       );
       _ownsRequestsController = true;
-    }
-
     if (widget.acceptanceController != null) {
       _acceptanceController = widget.acceptanceController!;
       _ownsAcceptanceController = false;
@@ -99,6 +104,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     _acceptanceController.addListener(_onAcceptanceStateChanged);
     _rejectionController.addListener(_onRejectionStateChanged);
+
+    _availabilityController = widget.availabilityController ??
+        DriverAvailabilityController(authController: _authController);
+
+    _availabilityController.addListener(_onAvailabilityStateChanged);
   }
 
   void _onRejectionStateChanged() {
@@ -150,10 +160,43 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (_ownsRejectionController) {
       _rejectionController.dispose();
     }
+    _availabilityController.removeListener(_onAvailabilityStateChanged);
+    if (widget.availabilityController == null) {
+      _availabilityController.dispose();
+    }
     if (_ownsRequestsController) {
       _requestsController.dispose();
     }
     super.dispose();
+  }
+
+  void _onAvailabilityStateChanged() {
+    if (!mounted) return;
+    
+    // Sync the local requests controller with the backend-verified availability state
+    _requestsController.setOnline(_availabilityController.isOnline);
+
+    if (_availabilityController.state.isError) {
+      final errorMessage = _availabilityController.errorMessage ??
+          'Failed to update availability.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _availabilityController.toggleAvailability(),
+          ),
+        ),
+      );
+      _availabilityController.clearError();
+    } else {
+      setState(() {});
+    }
+  }
+
+  Future<void> _handleToggleAvailability() async {
+    await _availabilityController.toggleAvailability();
   }
 
   UserModel? get _currentUser => widget.user ?? _authController.currentUser;
@@ -394,71 +437,137 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
 
-            // Availability Toggle Banner
-            const SizedBox(height: AppConstants.spaceL),
-            AnimatedBuilder(
-              animation: _requestsController,
-              builder: (context, _) {
-                final isOnline = _requestsController.isOnline;
-                return Card(
-                  elevation: 2,
-                  color: isOnline
-                      ? (isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5))
-                      : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                    side: BorderSide(
-                      color: isOnline ? Colors.green : Colors.grey,
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppConstants.spaceL),
-                    child: Row(
+            // Driver Availability Card (Functional)
+            Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                side: BorderSide(
+                  color: _availabilityController.isOnline
+                      ? Colors.green.withValues(alpha: 0.5)
+                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.spaceL),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          isOnline ? Icons.sensors_rounded : Icons.sensors_off_rounded,
-                          color: isOnline ? Colors.green : Colors.grey,
-                          size: 28,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _availabilityController.isOnline
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : theme.colorScheme.surfaceContainerHighest,
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusM),
+                          ),
+                          child: Icon(
+                            _availabilityController.isOnline
+                                ? Icons.sensors_rounded
+                                : Icons.sensors_off_rounded,
+                            color: _availabilityController.isOnline ? Colors.green : Colors.grey,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: AppConstants.spaceM),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                isOnline ? 'Online — Receiving Requests' : 'Offline — Unavailable',
-                                style: theme.textTheme.titleMedium?.copyWith(
+                              const Text(
+                                'Driver Availability',
+                                style: TextStyle(
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: isOnline
-                                      ? (isDark ? Colors.greenAccent : const Color(0xFF065F46))
-                                      : (isDark ? Colors.white70 : const Color(0xFF475569)),
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                isOnline
-                                    ? 'Available for incoming ride assignments'
-                                    : 'Turn online to start receiving ride requests',
+                                _availabilityController.isOnline
+                                    ? 'You are currently available for new rides.'
+                                    : 'You are currently not available for new rides.',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: isDark ? Colors.white60 : Colors.black54,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Switch(
-                          value: isOnline,
-                          activeColor: Colors.green,
-                          onChanged: (val) {
-                            _requestsController.setOnline(val);
-                          },
+                        const SizedBox(width: AppConstants.spaceS),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _availabilityController.isOnline
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.grey.withValues(alpha: 0.15),
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusPill),
+                            border: Border.all(
+                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
+                            ),
+                          ),
+                          child: Text(
+                            _availabilityController.isOnline ? 'Online' : 'Offline',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                );
-              },
+                    const SizedBox(height: AppConstants.spaceM),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _availabilityController.isUpdating
+                            ? null
+                            : _handleToggleAvailability,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _availabilityController.isOnline
+                              ? Colors.red.shade700
+                              : AppConstants.primaryAmber,
+                          foregroundColor:
+                              _availabilityController.isOnline ? Colors.white : Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: _availabilityController.isUpdating
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                _availabilityController.isOnline
+                                    ? Icons.power_settings_new_rounded
+                                    : Icons.bolt_rounded,
+                              ),
+                        label: Text(
+                          _availabilityController.isUpdating
+                              ? 'Updating...'
+                              : (_availabilityController.isOnline ? 'Go Offline' : 'Go Online'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             
             // DEBUG ONLY: Render the location sharing banner using a placeholder ride ID.

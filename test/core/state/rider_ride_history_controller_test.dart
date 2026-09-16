@@ -41,6 +41,9 @@ class MockRideService implements RideService {
 
   @override
   Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) async {}
+
+  @override
+  Future<void> submitRideFeedback(String rideId, String riderId, int rating, {String? comment}) async {}
 }
 
 class MockAuthController extends AuthController {
