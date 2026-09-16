@@ -4,6 +4,7 @@ import '../../models/ride_model.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_exception.dart';
 import '../../services/ride_service.dart';
+import '../../services/driver_availability_service.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
@@ -18,6 +19,7 @@ import 'view_state.dart';
 class IncomingRideRequestsController extends ChangeNotifier {
   final RideService _rideService;
   final AuthController _authController;
+  final DriverAvailabilityService _availabilityService;
 
   ViewState<List<RideModel>> _state = const ViewState.initial();
   StreamSubscription<List<RideModel>>? _subscription;
@@ -28,8 +30,10 @@ class IncomingRideRequestsController extends ChangeNotifier {
   IncomingRideRequestsController({
     RideService? rideService,
     AuthController? authController,
+    DriverAvailabilityService? availabilityService,
   })  : _rideService = rideService ?? RideService(),
-        _authController = authController ?? AuthController.instance {
+        _authController = authController ?? AuthController.instance,
+        _availabilityService = availabilityService ?? const DriverAvailabilityService() {
     _init();
   }
 
@@ -61,9 +65,23 @@ class IncomingRideRequestsController extends ChangeNotifier {
   /// Sets driver availability to Online (`true`) or Offline (`false`).
   ///
   /// Starting or stopping incoming request streaming dynamically based on availability.
-  void setOnline(bool online) {
+  Future<void> setOnline(bool online) async {
     if (_isDisposed) return;
     if (_isOnline == online) return;
+
+    final user = _authController.currentUser;
+    if (user != null) {
+      try {
+        await _availabilityService.setDriverOnlineStatus(user.id, online);
+      } catch (e) {
+        // If Firestore fails, we log and don't change local state, or change it back.
+        // For now, we proceed to change local state. In a robust app, we'd handle this cleanly.
+        debugPrint('Failed to sync online status: $e');
+        return; // Early return if we fail to update the server.
+      }
+    }
+
+    if (_isDisposed) return;
 
     _isOnline = online;
 
@@ -72,6 +90,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
     } else {
       stopListening();
     }
+    notifyListeners();
   }
 
   /// Toggles driver availability state between Online and Offline.

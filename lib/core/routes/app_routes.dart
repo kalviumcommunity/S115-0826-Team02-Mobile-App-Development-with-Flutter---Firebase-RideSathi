@@ -14,6 +14,7 @@ import '../../screens/rider/ride_review_boundary_screen.dart';
 import '../../screens/rider/ride_status_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/rider/rider_ride_history_screen.dart';
+import '../../screens/dispatch/driver_data_validation_screen.dart';
 import '../../screens/rider/ride_feedback_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
@@ -55,6 +56,7 @@ class AppRoutes {
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
+  static const String dispatcherDriverData = '/dispatcher/driver-data';
 
   /// Generates application routes based on [RouteSettings] with route protection.
   static Route<dynamic> generateRoute(
@@ -375,6 +377,24 @@ class AppRoutes {
         return _buildAccessErrorRoute(
           settings,
           'Dispatcher console is reserved for upcoming roadmap milestones.',
+        );
+
+      case dispatcherDriverData:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole != UserRole.dispatcher && userRole != UserRole.admin) {
+          return _buildAccessErrorRoute(
+            settings,
+            'Unauthorized. Dispatcher access required.',
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => const DriverDataValidationScreen(),
+          settings: settings,
         );
 
 

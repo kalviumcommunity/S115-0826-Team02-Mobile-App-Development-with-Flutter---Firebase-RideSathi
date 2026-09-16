@@ -29,6 +29,8 @@ class UserModel {
   final bool isUnionVerified;
   final bool isOnline;
   final String? vehicleInfo;
+  final bool isOnline;
+  final DateTime? availabilityUpdatedAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -41,6 +43,8 @@ class UserModel {
     this.isUnionVerified = false,
     this.isOnline = false,
     this.vehicleInfo,
+    this.isOnline = false,
+    this.availabilityUpdatedAt,
     required this.createdAt,
     this.updatedAt,
   });
@@ -55,6 +59,8 @@ class UserModel {
       'isUnionVerified': isUnionVerified,
       'isOnline': isOnline,
       'vehicleInfo': vehicleInfo,
+      'isOnline': isOnline,
+      if (availabilityUpdatedAt != null) 'availabilityUpdatedAt': availabilityUpdatedAt!.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
@@ -83,11 +89,17 @@ class UserModel {
       isUnionVerified: parsedVerified,
       isOnline: parsedOnline,
       vehicleInfo: map['vehicleInfo'] as String?,
+      isOnline: map['isOnline'] as bool? ?? false,
+      availabilityUpdatedAt: map['availabilityUpdatedAt'] != null
+          ? (map['availabilityUpdatedAt'] is String
+              ? DateTime.tryParse(map['availabilityUpdatedAt'] as String)
+              : null)
+          : null,
       createdAt: map['createdAt'] != null
-          ? DateTime.parse(map['createdAt'] as String)
+          ? (map['createdAt'] is String ? DateTime.parse(map['createdAt'] as String) : DateTime.now())
           : DateTime.now(),
       updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'] as String)
+          ? (map['updatedAt'] is String ? DateTime.tryParse(map['updatedAt'] as String) : null)
           : null,
     );
   }
@@ -101,6 +113,8 @@ class UserModel {
     bool? isUnionVerified,
     bool? isOnline,
     String? vehicleInfo,
+    bool? isOnline,
+    DateTime? availabilityUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -113,6 +127,8 @@ class UserModel {
       isUnionVerified: isUnionVerified ?? this.isUnionVerified,
       isOnline: isOnline ?? this.isOnline,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
+      isOnline: isOnline ?? this.isOnline,
+      availabilityUpdatedAt: availabilityUpdatedAt ?? this.availabilityUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
