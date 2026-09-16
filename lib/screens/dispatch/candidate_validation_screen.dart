@@ -26,12 +26,12 @@ class CandidateValidationScreen extends StatefulWidget {
 }
 
 class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
-  late final NearestDriverController _controller;
+  late final FallbackMatchingController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = NearestDriverController();
+    _controller = FallbackMatchingController();
     _controller.addListener(_onStateChanged);
     _controller.startListening(widget.ride);
   }
@@ -59,7 +59,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nearest Driver Matching'),
+        title: const Text('Matching Fallback & Candidates'),
       ),
       body: Column(
         children: [
@@ -77,9 +77,12 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                 icon: Icons.search_off_rounded,
                 message: msg,
               ),
-              success: (evaluations) {
+              success: (attemptState) {
+                final evaluations = attemptState.rankedCandidates;
                 final eligible = evaluations.where((e) => e.isEligible).toList();
                 final excluded = evaluations.where((e) => !e.isEligible).toList();
+                
+                final currentCandidateId = attemptState.currentCandidate?.driver.id;
 
                 return RefreshIndicator(
                   onRefresh: () async {
@@ -89,18 +92,30 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(AppConstants.spaceL),
                     children: [
+                      if (attemptState.status == MatchingAttemptStatus.fallbackTransition)
+                        _buildFallbackNotice(context, attemptState.lastFallbackReason),
+                      if (attemptState.status == MatchingAttemptStatus.timedOut)
+                        _buildTimedOutNotice(context),
+                        
                       _buildSectionHeader(context, 'Eligible Candidates', eligible.length),
                       if (eligible.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: AppConstants.spaceM),
-                          child: Text('No eligible candidates found.'),
+                          child: Text('No eligible candidates found. Waiting...'),
                         ),
-                      ...eligible.asMap().entries.map((e) => _buildCandidateCard(
-                            context,
-                            e.value,
-                            rank: e.key + 1,
-                            isNearest: e.key == 0,
-                          )),
+                      ...eligible.asMap().entries.map((e) {
+                        final isCurrent = e.value.driver.id == currentCandidateId;
+                        final isNext = (!isCurrent && eligible.indexOf(e.value) == 1 && currentCandidateId != null) || 
+                                       (currentCandidateId == null && e.key == 0);
+                        
+                        return _buildCandidateCard(
+                          context,
+                          e.value,
+                          rank: e.key + 1,
+                          isCurrentCandidate: isCurrent,
+                          isNextCandidate: isNext,
+                        );
+                      }),
                       const SizedBox(height: AppConstants.spaceL),
                       _buildSectionHeader(context, 'Excluded Drivers', excluded.length),
                       if (excluded.isEmpty)
@@ -118,6 +133,61 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildFallbackNotice(BuildContext context, FallbackReason? reason) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppConstants.spaceL),
+      padding: const EdgeInsets.all(AppConstants.spaceM),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error),
+          const SizedBox(width: AppConstants.spaceS),
+          Expanded(
+            child: Text(
+              'Fallback triggered: ${_formatReason(reason)}',
+              style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimedOutNotice(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppConstants.spaceL),
+      padding: const EdgeInsets.all(AppConstants.spaceM),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.timer_off_rounded),
+          SizedBox(width: AppConstants.spaceS),
+          Expanded(child: Text('Ride Request Timed Out.')),
+        ],
+      ),
+    );
+  }
+  
+  String _formatReason(FallbackReason? reason) {
+    switch (reason) {
+      case FallbackReason.wentOffline: return 'Driver went offline';
+      case FallbackReason.activeOnAnotherRide: return 'Driver is active on another ride';
+      case FallbackReason.lostLocation: return 'Driver lost location';
+      case FallbackReason.noLongerEligible: return 'Driver is no longer eligible';
+      case FallbackReason.disappeared: return 'Candidate disappeared from stream';
+      case FallbackReason.rankChanged: return 'Another driver became closer';
+      case FallbackReason.acceptedAnotherRide: return 'Driver accepted another ride';
+      case FallbackReason.unknown:
+      default: return 'Unknown reason';
+    }
   }
 
   Widget _buildRideInfo(BuildContext context) {
@@ -179,14 +249,15 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
     BuildContext context,
     CandidateEvaluation eval, {
     int? rank,
-    bool isNearest = false,
+    bool isCurrentCandidate = false,
+    bool isNextCandidate = false,
   }) {
     final driver = eval.driver;
     final isEligible = eval.isEligible;
 
     return Card(
       color: isEligible
-          ? (isNearest ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.25) : null)
+          ? (isCurrentCandidate ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.25) : null)
           : Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
       margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
       child: Padding(
@@ -204,7 +275,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                       '#$rank',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isNearest
+                            color: isCurrentCandidate
                                 ? Theme.of(context).colorScheme.primary
                                 : null,
                           ),
@@ -227,7 +298,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                                   ),
                             ),
                           ),
-                          if (isNearest) ...[
+                          if (isCurrentCandidate || isNextCandidate) ...[
                             const SizedBox(width: AppConstants.spaceS),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -235,13 +306,17 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: isCurrentCandidate 
+                                    ? Theme.of(context).colorScheme.primary 
+                                    : Theme.of(context).colorScheme.secondary,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                'Nearest',
+                                isCurrentCandidate ? 'Current Candidate' : 'Next Candidate',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onPrimary,
+                                  color: isCurrentCandidate 
+                                      ? Theme.of(context).colorScheme.onPrimary 
+                                      : Theme.of(context).colorScheme.onSecondary,
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
