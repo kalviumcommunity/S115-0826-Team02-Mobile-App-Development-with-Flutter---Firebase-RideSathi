@@ -10,6 +10,9 @@ class AppConstants {
   static const String unionName = 'Regional Cab & Auto Drivers Union';
   static const String unionCode = 'RCADU-2026';
 
+  // Configuration
+  static const Duration rideRequestTimeout = Duration(minutes: 2);
+
   // Branding Colors
   static const Color primaryAmber = Color(0xFFFFB300); // Cab/Auto Vibrant Yellow-Gold
   static const Color secondaryTeal = Color(0xFF00897B); // Regional Union Teal
