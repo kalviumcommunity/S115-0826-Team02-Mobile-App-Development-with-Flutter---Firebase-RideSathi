@@ -16,7 +16,7 @@ import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/info_card.dart';
 import '../../widgets/loading_view.dart';
-import '../../widgets/location_sharing_status_banner.dart';
+
 import '../../widgets/ride_summary_card.dart';
 import '../../widgets/union_badge.dart';
 
@@ -577,11 +577,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
             ),
             
-            // DEBUG ONLY: Render the location sharing banner using a placeholder ride ID.
-            if (kDebugMode && Firebase.apps.isNotEmpty) ...[
-              const SizedBox(height: AppConstants.spaceM),
-              const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
-            ],
+
             
             const SizedBox(height: AppConstants.spaceXL),
 
