@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Reusable Functions
+    // -------------------------------------------------------------------------
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isRider() {
+      return isAuthenticated() && getUserData().role == 'rider';
+    }
+
+    function isDriver() {
+      return isAuthenticated() && getUserData().role == 'driver';
+    }
+
+    function isDispatcher() {
+      return isAuthenticated() && getUserData().role == 'dispatcher';
+    }
+
+    // Ensures the client uses serverTimestamp for the given field
+    function isServerTimestamp(field) {
+      return request.resource.data[field] == request.time;
+    }
+
+    function affectedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isModifyingProtectedFields() {
+      return affectedKeys().hasAny(['id', 'email', 'role', 'isUnionVerified', 'createdAt']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Rules
+    // -------------------------------------------------------------------------
+
+    match /users/{userId} {
+      // Any authenticated user can read profiles for nearest matching or dispatch, 
+      // but only dispatchers can view all details. For nearest matching, riders need driver locations, 
+      // but currently the architecture doesn't use a separate location collection.
+      // We will allow authenticated read.
+      allow read: if isAuthenticated();
+
+      // Creation requires the uid to match the document id and no escalation
+      allow create: if isOwner(userId)
+                    && request.resource.data.id == userId
+                    && request.resource.data.role in ['rider', 'driver']
+                    && request.resource.data.isUnionVerified == false
+                    && isServerTimestamp('createdAt')
+                    && isServerTimestamp('updatedAt');
+
+      // Update requires ownership, prevents role/verification escalation and protected field modification.
+      // Except availability updating by driver which is allowed but limited.
+      allow update: if isOwner(userId)
+                    && !isModifyingProtectedFields()
+                    && isServerTimestamp('updatedAt');
+    }
+
+    match /rides/{rideId} {
+      // Read access: Rider who created it, Driver assigned to it, or Dispatcher
+      allow read: if isAuthenticated() && (
+        resource.data.riderId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isDispatcher()
+      );
+
+      // Create: Only riders can create rides for themselves
+      allow create: if isRider()
+                    && request.resource.data.riderId == request.auth.uid
+                    && request.resource.data.status == 'requested'
+                    && isServerTimestamp('createdAt')
+                    && isServerTimestamp('updatedAt');
+
+      // Update: 
+      // Rider can cancel if requested or accepted.
+      // Driver can accept, arrive, start, complete, or update driverLocation.
+      // Dispatcher can assign, reassign, etc.
+      // To strictly validate this without complex business logic duplicating in rules, 
+      // we check ownership and prevent arbitrary protected fields modification.
+      allow update: if isAuthenticated() && (
+        // Dispatcher can modify arbitrarily for assignment
+        isDispatcher() ||
+        
+        // Rider can update (cancel)
+        (resource.data.riderId == request.auth.uid && affectedKeys().hasOnly(['status', 'updatedAt']) && request.resource.data.status == 'cancelled') ||
+        
+        // Driver can update (accept, arrive, location, etc.)
+        (
+          isDriver() &&
+          (resource.data.driverId == null || resource.data.driverId == request.auth.uid) // allow assignment acceptance or assigned updates
+          && !affectedKeys().hasAny(['riderId', 'createdAt', 'estimatedFare'])
+        )
+      ) && isServerTimestamp('updatedAt');
+    }
+  }
+}
