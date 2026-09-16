@@ -353,6 +353,65 @@ class RideService {
     }
   }
 
+  /// Observes the driver's current active (accepted) ride in real-time.
+  ///
+  /// Streams the single ride where:
+  ///   - `driverId == authenticatedDriverId`
+  ///   - `status == 'accepted'`
+  ///
+  /// Yields `null` when no active ride exists.
+  ///
+  /// If multiple accepted rides are found for the same driver (a data-integrity
+  /// violation), this method emits a [FirestoreException] with code
+  /// `integrity-violation` rather than silently picking one.
+  ///
+  /// The [driverId] must be non-empty.
+  Stream<RideModel?> watchDriverActiveRide(String driverId) {
+    if (driverId.trim().isEmpty) {
+      return Stream.error(const FirestoreException('Invalid driver ID.'));
+    }
+
+    try {
+      return _rides
+          .where('driverId', isEqualTo: driverId.trim())
+          .where('status', isEqualTo: RideStatus.accepted.name)
+          .snapshots()
+          .map((snapshot) {
+        final validDocs = <RideModel>[];
+
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          if (data == null) continue;
+          try {
+            final ride = RideModel.fromMap(data, doc.id);
+            // Strict guard: data['status'] must literally equal 'accepted'
+            if (ride.status == RideStatus.accepted &&
+                data['status'] == RideStatus.accepted.name) {
+              validDocs.add(ride);
+            }
+          } catch (_) {
+            // Skip malformed documents
+            continue;
+          }
+        }
+
+        if (validDocs.length > 1) {
+          // Data-integrity violation: more than one accepted ride for the same driver
+          throw const FirestoreException(
+            'Multiple active rides found. Please contact support.',
+            code: 'integrity-violation',
+          );
+        }
+
+        return validDocs.isEmpty ? null : validDocs.first;
+      }).handleError((error) {
+        throw FirestoreException.from(error);
+      });
+    } catch (e) {
+      return Stream.error(FirestoreException.from(e));
+    }
+  }
+
   /// Submits feedback for a completed ride.
   /// 
   /// The [riderId] must match the currently authenticated user's ID to enforce ownership.

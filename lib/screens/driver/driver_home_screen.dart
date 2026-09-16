@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/state/active_ride_controller.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/incoming_ride_requests_controller.dart';
 import '../../core/state/ride_acceptance_controller.dart';
@@ -61,6 +62,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final IncomingRideRequestsController _requestsController;
   late final RideAcceptanceController _acceptanceController;
   late final RideRejectionController _rejectionController;
+  late final ActiveRideController _activeRideController;
   late final DriverAvailabilityController _availabilityController;
   bool _isLoggingOut = false;
   bool _ownsRequestsController = false;
@@ -102,6 +104,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _ownsRejectionController = true;
     }
 
+    // ActiveRideController is always owned by this screen; used for the banner
+    _activeRideController = ActiveRideController(authController: _authController)
+      ..startListening();
+
     _acceptanceController.addListener(_onAcceptanceStateChanged);
     _rejectionController.addListener(_onRejectionStateChanged);
 
@@ -133,20 +139,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   void _onAcceptanceStateChanged() {
     final state = _acceptanceController.state;
     if (state.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.message ?? 'Ride accepted successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Navigate to Active Ride screen after successful acceptance
+      if (mounted) {
+        AppNavigator.toDriverActiveRide(context);
+      }
     } else if (state.isError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.message ?? 'Failed to accept ride.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      _acceptanceController.clearError();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.message ?? 'Failed to accept ride.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        _acceptanceController.clearError();
+      }
     }
   }
 
@@ -167,6 +173,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (_ownsRequestsController) {
       _requestsController.dispose();
     }
+    _activeRideController.dispose();
     super.dispose();
   }
 
@@ -577,6 +584,93 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ],
             
             const SizedBox(height: AppConstants.spaceXL),
+
+            // Active Ride Banner — shown when driver has an accepted ride
+            AnimatedBuilder(
+              animation: _activeRideController,
+              builder: (context, _) {
+                final activeRide = _activeRideController.activeRide;
+                if (activeRide == null) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Active Ride',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppConstants.spaceM),
+                    Card(
+                      color: isDark
+                          ? const Color(0xFF064E3B)
+                          : const Color(0xFFECFDF5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                        side: const BorderSide(color: Colors.green, width: 1.5),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppConstants.spaceL),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded,
+                                    color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Ride Accepted',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? Colors.greenAccent
+                                        : const Color(0xFF065F46),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppConstants.spaceM),
+                            Text(
+                              'Pickup: ${activeRide.pickup.address.trim().isNotEmpty ? activeRide.pickup.address : 'Pending'}',
+                              style: theme.textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'Drop: ${activeRide.destination.address.trim().isNotEmpty ? activeRide.destination.address : 'Pending'}',
+                              style: theme.textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: AppConstants.spaceM),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () =>
+                                    AppNavigator.toDriverActiveRide(context),
+                                icon: const Icon(Icons.open_in_new_rounded,
+                                    size: 18),
+                                label: const Text('Open Active Ride'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        AppConstants.radiusM),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppConstants.spaceXL),
+                  ],
+                );
+              },
+            ),
 
             // Incoming Ride Requests Section Header
             Row(
