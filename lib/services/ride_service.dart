@@ -255,6 +255,63 @@ class RideService {
     }
   }
 
+  /// Atomically rejects an incoming ride request on behalf of a driver.
+  /// 
+  /// The [driverId] must match the currently authenticated driver's ID.
+  /// Throws a [FirestoreException] if the ride doesn't exist, is no longer requested,
+  /// or is not assigned to this driver.
+  Future<void> rejectRide(String rideId, String driverId) async {
+    if (rideId.trim().isEmpty) {
+      throw ArgumentError('Ride ID cannot be empty.');
+    }
+    if (driverId.trim().isEmpty) {
+      throw ArgumentError('Driver ID cannot be empty.');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          throw const FirestoreException('Ride not found.', code: 'not-found');
+        }
+
+        final data = snapshot.data();
+        if (data == null) {
+          throw const FirestoreException('Ride data is corrupted.', code: 'data-corrupted');
+        }
+
+        // Validate Ownership constraint: if there is an assigned driver, it must match.
+        // For rejection, we only allow drivers explicitly assigned to reject it.
+        final assignedDriverId = data['driverId'];
+        if (assignedDriverId != driverId) {
+          throw const FirestoreException('Unauthorized to reject this ride. Not assigned to you.', code: 'permission-denied');
+        }
+
+        // Validate Status transition: only 'requested' is allowed.
+        final currentStatusStr = data['status'] as String?;
+        if (currentStatusStr != RideStatus.requested.name) {
+          if (currentStatusStr == RideStatus.cancelled.name) {
+             throw const FirestoreException('This ride has been cancelled by the rider.', code: 'invalid-state');
+          } else {
+             throw const FirestoreException('This ride is no longer in a requested state.', code: 'invalid-state');
+          }
+        }
+
+        // Perform the atomic update
+        transaction.update(docRef, {
+          'status': RideStatus.rejected.name,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
+
   /// Observes incoming ride requests explicitly assigned to the specified [driverId] in real-time.
   /// 
   /// Streams rides where `driverId == driverId` and `status == 'requested'`.
