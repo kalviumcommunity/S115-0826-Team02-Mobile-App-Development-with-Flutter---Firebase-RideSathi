@@ -107,6 +107,7 @@ class UserProfileService {
     'email',
     'role',
     'isUnionVerified',
+    'isOnline',
     'createdAt',
   };
 

@@ -27,6 +27,7 @@ class UserModel {
   final String? email;
   final UserRole role;
   final bool isUnionVerified;
+  final bool isOnline;
   final String? vehicleInfo;
   final bool isOnline;
   final DateTime? availabilityUpdatedAt;
@@ -40,6 +41,7 @@ class UserModel {
     this.email,
     required this.role,
     this.isUnionVerified = false,
+    this.isOnline = false,
     this.vehicleInfo,
     this.isOnline = false,
     this.availabilityUpdatedAt,
@@ -55,6 +57,7 @@ class UserModel {
       'email': email,
       'role': role.name,
       'isUnionVerified': isUnionVerified,
+      'isOnline': isOnline,
       'vehicleInfo': vehicleInfo,
       'isOnline': isOnline,
       if (availabilityUpdatedAt != null) 'availabilityUpdatedAt': availabilityUpdatedAt!.toIso8601String(),
@@ -71,13 +74,20 @@ class UserModel {
       throw FormatException('Invalid or unrecognized user role: "$roleString"');
     }
 
+    final rawVerified = map['isUnionVerified'];
+    final bool parsedVerified = rawVerified is bool ? rawVerified : false;
+
+    final rawOnline = map['isOnline'];
+    final bool parsedOnline = rawOnline is bool ? rawOnline : false;
+
     return UserModel(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       phoneNumber: map['phoneNumber'] as String? ?? '',
       email: map['email'] as String?,
       role: parsedRole,
-      isUnionVerified: map['isUnionVerified'] as bool? ?? false,
+      isUnionVerified: parsedVerified,
+      isOnline: parsedOnline,
       vehicleInfo: map['vehicleInfo'] as String?,
       isOnline: map['isOnline'] as bool? ?? false,
       availabilityUpdatedAt: map['availabilityUpdatedAt'] != null
@@ -101,6 +111,7 @@ class UserModel {
     String? email,
     UserRole? role,
     bool? isUnionVerified,
+    bool? isOnline,
     String? vehicleInfo,
     bool? isOnline,
     DateTime? availabilityUpdatedAt,
@@ -114,6 +125,7 @@ class UserModel {
       email: email ?? this.email,
       role: role ?? this.role,
       isUnionVerified: isUnionVerified ?? this.isUnionVerified,
+      isOnline: isOnline ?? this.isOnline,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
       isOnline: isOnline ?? this.isOnline,
       availabilityUpdatedAt: availabilityUpdatedAt ?? this.availabilityUpdatedAt,
@@ -122,4 +134,3 @@ class UserModel {
     );
   }
 }
-

@@ -21,6 +21,36 @@ enum VehicleType {
   cabSUV,
 }
 
+/// Represents feedback left by a rider.
+class RideFeedback {
+  final int rating;
+  final String? comment;
+  final DateTime createdAt;
+
+  const RideFeedback({
+    required this.rating,
+    this.comment,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'rating': rating,
+      if (comment != null) 'comment': comment,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  factory RideFeedback.fromMap(Map<String, dynamic> map) {
+    final createVal = map['createdAt'];
+    return RideFeedback(
+      rating: map['rating'] as int? ?? 5,
+      comment: map['comment'] as String?,
+      createdAt: createVal is Timestamp ? createVal.toDate() : DateTime.now(),
+    );
+  }
+}
+
 /// Baseline Ride request data model for RideSathi.
 class RideModel {
   final String id;
@@ -32,6 +62,7 @@ class RideModel {
   final VehicleType vehicleType;
   final RideStatus status;
   final double estimatedFare;
+  final RideFeedback? feedback;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -45,6 +76,7 @@ class RideModel {
     required this.vehicleType,
     required this.status,
     required this.estimatedFare,
+    this.feedback,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -60,6 +92,7 @@ class RideModel {
       'vehicleType': vehicleType.name,
       'status': status.name,
       'estimatedFare': estimatedFare,
+      if (feedback != null) 'feedback': feedback!.toMap(),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
@@ -87,6 +120,9 @@ class RideModel {
         orElse: () => RideStatus.requested,
       ),
       estimatedFare: (map['estimatedFare'] as num? ?? 0.0).toDouble(),
+      feedback: map['feedback'] != null
+          ? RideFeedback.fromMap(map['feedback'] as Map<String, dynamic>)
+          : null,
       createdAt: createVal is Timestamp ? createVal.toDate() : DateTime.now(),
       updatedAt: updateVal is Timestamp ? updateVal.toDate() : DateTime.now(),
     );

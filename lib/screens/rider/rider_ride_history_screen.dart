@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/rider_ride_history_controller.dart';
+import '../../core/routes/app_routes.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/ride_history_card.dart';
@@ -79,8 +80,18 @@ class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
                 padding: const EdgeInsets.all(AppConstants.spaceM),
                 itemCount: history.length,
                 itemBuilder: (context, index) {
+                  final ride = history[index];
                   return RideHistoryCard(
-                    ride: history[index],
+                    ride: ride,
+                    onTap: (ride.status == RideStatus.completed && ride.feedback == null)
+                        ? () {
+                            AppNavigator.pushNamed(
+                              context,
+                              AppRoutes.riderFeedback,
+                              arguments: {'rideId': ride.id},
+                            ).then((_) => _controller.loadHistory()); // Refresh after feedback
+                          }
+                        : null,
                   );
                 },
               ),
