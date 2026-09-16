@@ -15,6 +15,7 @@ import '../../screens/rider/ride_status_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/rider/rider_ride_history_screen.dart';
 import '../../screens/dispatch/driver_data_validation_screen.dart';
+import '../../screens/rider/ride_feedback_screen.dart';
 import '../../screens/splash_screen.dart';
 import '../../widgets/error_view.dart';
 import '../state/location_selection_controller.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static const String riderReviewRide = '/rider/review-ride';
   static const String riderStatus = '/rider/ride-status';
   static const String riderHistory = '/rider/history';
+  static const String riderFeedback = '/rider/feedback';
 
   // Reserved Future Role Route
   static const String dispatcherHome = '/dispatcher/home';
@@ -342,6 +344,32 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => const RiderRideHistoryScreen(),
+          settings: settings,
+        );
+
+      case riderFeedback:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole == UserRole.driver) {
+          return MaterialPageRoute(
+            builder: (_) => DriverHomeScreen(
+              authController: controller,
+              user: userFromArgs,
+            ),
+            settings: settings,
+          );
+        }
+        final feedbackArgs = settings.arguments as Map<String, dynamic>?;
+        final feedbackRideId = feedbackArgs?['rideId'] as String?;
+        if (feedbackRideId == null || feedbackRideId.trim().isEmpty) {
+          return _buildAccessErrorRoute(settings, 'Missing ride ID for feedback.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => RideFeedbackScreen(rideId: feedbackRideId),
           settings: settings,
         );
 

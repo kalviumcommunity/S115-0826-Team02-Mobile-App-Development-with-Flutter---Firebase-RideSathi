@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/models/location_model.dart';
 import 'package:ridesathi/models/ride_model.dart';
+import 'package:ridesathi/models/user_model.dart';
 
 void main() {
   group('LocationModel Serialization', () {
@@ -16,7 +17,12 @@ void main() {
     });
 
     test('toMap and fromMap work correctly with coordinates', () {
-      const loc = LocationModel(id: '1', displayName: 'A', address: 'B', latitude: 10.0, longitude: 20.0);
+      const loc = LocationModel(
+          id: '1',
+          displayName: 'A',
+          address: 'B',
+          latitude: 10.0,
+          longitude: 20.0);
       final map = loc.toMap();
       expect(map['latitude'], 10.0);
       expect(map['longitude'], 20.0);
@@ -28,7 +34,8 @@ void main() {
   });
 
   group('RideModel Serialization', () {
-    test('fromMap creates correct instance from map with DateTime fallback', () {
+    test('fromMap creates correct instance from map with DateTime fallback',
+        () {
       final map = {
         'id': 'r1',
         'riderId': 'u1',
@@ -46,6 +53,71 @@ void main() {
       expect(ride.destination.id, 'd1');
       expect(ride.vehicleType, VehicleType.autoRickshaw);
       expect(ride.status, RideStatus.requested);
+    });
+  });
+
+  group('UserModel Serialization & Verification Hardening', () {
+    final baseUserMap = {
+      'id': 'driver-123',
+      'name': 'Test Driver',
+      'phoneNumber': '+919999988888',
+      'email': 'driver@test.com',
+      'role': 'driver',
+      'vehicleInfo': 'Auto KA-01-A-1234',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+
+    test('serializes and deserializes boolean true for isUnionVerified', () {
+      final map = Map<String, dynamic>.from(baseUserMap);
+      map['isUnionVerified'] = true;
+
+      final user = UserModel.fromMap(map);
+      expect(user.isUnionVerified, isTrue);
+      expect(user.toMap()['isUnionVerified'], isTrue);
+    });
+
+    test('serializes and deserializes boolean false for isUnionVerified', () {
+      final map = Map<String, dynamic>.from(baseUserMap);
+      map['isUnionVerified'] = false;
+
+      final user = UserModel.fromMap(map);
+      expect(user.isUnionVerified, isFalse);
+      expect(user.toMap()['isUnionVerified'], isFalse);
+    });
+
+    test('defaults isUnionVerified to false when key is missing', () {
+      final map = Map<String, dynamic>.from(baseUserMap);
+
+      final user = UserModel.fromMap(map);
+      expect(user.isUnionVerified, isFalse);
+    });
+
+    test('defaults isUnionVerified to false when value is null', () {
+      final map = Map<String, dynamic>.from(baseUserMap);
+      map['isUnionVerified'] = null;
+
+      final user = UserModel.fromMap(map);
+      expect(user.isUnionVerified, isFalse);
+    });
+
+    test(
+        'defaults isUnionVerified to false when value is malformed (String, int, Map, List)',
+        () {
+      for (final malformed in [
+        'true',
+        '1',
+        1,
+        0,
+        ['verified'],
+        {'status': 'approved'}
+      ]) {
+        final map = Map<String, dynamic>.from(baseUserMap);
+        map['isUnionVerified'] = malformed;
+
+        final user = UserModel.fromMap(map);
+        expect(user.isUnionVerified, isFalse,
+            reason: 'Failed for malformed value: $malformed');
+      }
     });
   });
 }
