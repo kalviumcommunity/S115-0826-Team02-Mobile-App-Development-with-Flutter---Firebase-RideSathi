@@ -17,10 +17,15 @@ class CandidateEvaluation {
   /// Common reasons: 'OFFLINE', 'ACTIVE_RIDE', 'NO_LOCATION', 'INVALID_DATA'
   final String? exclusionReason;
 
+  /// The straight-line distance to the pickup location in kilometers.
+  /// Only available if evaluated for proximity.
+  final double? distanceKm;
+
   const CandidateEvaluation({
     required this.driver,
     required this.isEligible,
     this.exclusionReason,
+    this.distanceKm,
   }) : assert(
           isEligible || exclusionReason != null,
           'Excluded candidates must have an exclusion reason.',
@@ -33,9 +38,24 @@ class CandidateEvaluation {
     return other is CandidateEvaluation &&
         other.driver == driver &&
         other.isEligible == isEligible &&
-        other.exclusionReason == exclusionReason;
+        other.exclusionReason == exclusionReason &&
+        other.distanceKm == distanceKm;
   }
 
   @override
-  int get hashCode => Object.hash(driver, isEligible, exclusionReason);
+  int get hashCode => Object.hash(driver, isEligible, exclusionReason, distanceKm);
+
+  CandidateEvaluation copyWith({
+    DriverOperationalData? driver,
+    bool? isEligible,
+    String? exclusionReason,
+    double? distanceKm,
+  }) {
+    return CandidateEvaluation(
+      driver: driver ?? this.driver,
+      isEligible: isEligible ?? this.isEligible,
+      exclusionReason: exclusionReason ?? this.exclusionReason,
+      distanceKm: distanceKm ?? this.distanceKm,
+    );
+  }
 }
