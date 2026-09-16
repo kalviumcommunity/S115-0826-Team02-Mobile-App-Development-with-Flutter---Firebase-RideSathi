@@ -198,6 +198,47 @@ class RideService {
     }
   }
 
+  /// Observes incoming ride requests explicitly assigned to the specified [driverId] in real-time.
+  /// 
+  /// Streams rides where `driverId == driverId` and `status == 'requested'`.
+  /// The [driverId] must be non-empty.
+  /// Malformed documents are safely skipped.
+  /// Throws a [FirestoreException] on stream failure.
+  Stream<List<RideModel>> watchIncomingRideRequests(String driverId) {
+    if (driverId.trim().isEmpty) {
+      return Stream.error(const FirestoreException('Invalid driver ID.'));
+    }
+
+    try {
+      return _rides
+          .where('driverId', isEqualTo: driverId.trim())
+          .where('status', isEqualTo: RideStatus.requested.name)
+          .snapshots()
+          .map((snapshot) {
+        final List<RideModel> requests = [];
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          if (data == null) continue;
+          try {
+            final ride = RideModel.fromMap(data, doc.id);
+            // Strict check on status to prevent malformed status fallback from making an invalid document actionable
+            if (ride.status == RideStatus.requested && data['status'] == RideStatus.requested.name) {
+              requests.add(ride);
+            }
+          } catch (_) {
+            // Gracefully skip malformed document
+            continue;
+          }
+        }
+        return requests;
+      }).handleError((error) {
+        throw FirestoreException.from(error);
+      });
+    } catch (e) {
+      return Stream.error(FirestoreException.from(e));
+    }
+  }
+
   /// Submits feedback for a completed ride.
   /// 
   /// The [riderId] must match the currently authenticated user's ID to enforce ownership.

@@ -1,23 +1,32 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ridesathi/core/constants/app_constants.dart';
-import 'package:ridesathi/core/routes/app_routes.dart';
-import 'package:ridesathi/core/state/auth_controller.dart';
-import 'package:ridesathi/core/state/driver_availability_controller.dart';
-import 'package:ridesathi/core/theme/theme_controller.dart';
-import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/widgets/error_view.dart';
-import 'package:ridesathi/widgets/info_card.dart';
-import 'package:ridesathi/widgets/loading_view.dart';
-import 'package:ridesathi/widgets/union_badge.dart';
+import 'package:firebase_core/firebase_core.dart';
+import '../../core/constants/app_constants.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/state/auth_controller.dart';
+import '../../core/state/incoming_ride_requests_controller.dart';
+import '../../core/state/driver_availability_controller.dart';
+import '../../core/theme/theme_controller.dart';
+import '../../models/ride_model.dart';
+import '../../models/user_model.dart';
+import '../../widgets/empty_state_view.dart';
+import '../../widgets/error_view.dart';
+import '../../widgets/info_card.dart';
+import '../../widgets/loading_view.dart';
+import '../../widgets/location_sharing_status_banner.dart';
+import '../../widgets/ride_summary_card.dart';
+import '../../widgets/union_badge.dart';
 
-/// Primary landing and operational dashboard screen for authenticated Drivers in RideSathi.
+/// Landing and dashboard screen for authenticated Drivers in RideSathi.
 ///
-/// Displays driver identity, registered vehicle details, union verification status,
-/// explicit online/offline availability control, future operational shells (requests, current ride),
-/// and supports clean logout with navigation stack clearing.
+/// Displays driver identity, vehicle details, availability status (Online/Offline),
+/// incoming ride request queue, and supports clean logout with navigation stack clearing.
 class DriverHomeScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
+
+  /// Optional [IncomingRideRequestsController] for dependency injection in tests.
+  final IncomingRideRequestsController? requestsController;
 
   /// Optional [DriverAvailabilityController] for dependency injection in tests.
   final DriverAvailabilityController? availabilityController;
@@ -28,6 +37,7 @@ class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({
     super.key,
     this.authController,
+    this.requestsController,
     this.availabilityController,
     this.user,
   });
@@ -38,13 +48,26 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final AuthController _authController;
+  late final IncomingRideRequestsController _requestsController;
   late final DriverAvailabilityController _availabilityController;
   bool _isLoggingOut = false;
+  bool _ownsRequestsController = false;
 
   @override
   void initState() {
     super.initState();
     _authController = widget.authController ?? AuthController.instance;
+    
+    if (widget.requestsController != null) {
+      _requestsController = widget.requestsController!;
+      _ownsRequestsController = false;
+    } else {
+      _requestsController = IncomingRideRequestsController(
+        authController: _authController,
+      );
+      _ownsRequestsController = true;
+    }
+
     _availabilityController = widget.availabilityController ??
         DriverAvailabilityController(authController: _authController);
 
@@ -57,11 +80,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (widget.availabilityController == null) {
       _availabilityController.dispose();
     }
+    if (_ownsRequestsController) {
+      _requestsController.dispose();
+    }
     super.dispose();
   }
 
   void _onAvailabilityStateChanged() {
     if (!mounted) return;
+    
+    // Sync the local requests controller with the backend-verified availability state
+    _requestsController.setOnline(_availabilityController.isOnline);
+
     if (_availabilityController.state.isError) {
       final errorMessage = _availabilityController.errorMessage ??
           'Failed to update availability.';
@@ -81,11 +111,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
+  Future<void> _handleToggleAvailability() async {
+    await _availabilityController.toggleAvailability();
+  }
+
   UserModel? get _currentUser => widget.user ?? _authController.currentUser;
 
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
     setState(() => _isLoggingOut = true);
+
+    _requestsController.setOnline(false);
 
     final success = await _authController.signOut();
 
@@ -111,85 +147,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  Future<void> _handleToggleAvailability() async {
-    await _availabilityController.toggleAvailability();
+  String _formatDateTime(DateTime dateTime) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final month = months[dateTime.month - 1];
+    final hour = dateTime.hour == 0 ? 12 : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+    final period = dateTime.hour < 12 ? 'AM' : 'PM';
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+
+    return '$month ${dateTime.day}, ${dateTime.year} - $hour:$minute $period';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    // Check auth loading state
-    if (_authController.state.isLoading && widget.user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('${AppConstants.appName} Driver'),
-        ),
-        body: const LoadingView(
-          message: 'Loading driver profile...',
-        ),
-      );
-    }
-
     final user = _currentUser;
-
-    // Missing profile or unauthenticated state
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('${AppConstants.appName} Driver'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Log Out',
-              onPressed: _handleLogout,
-            ),
-          ],
-        ),
-        body: ErrorView(
-          title: 'Driver Profile Not Found',
-          message:
-              'Unable to resolve authenticated driver information. Please log in again.',
-          icon: Icons.account_circle_outlined,
-          retryLabel: 'Log Out & Re-authenticate',
-          onRetry: _handleLogout,
-        ),
-      );
-    }
-
-    // Role protection check
-    if (user.role != UserRole.driver) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Access Restricted'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout_rounded),
-              tooltip: 'Log Out',
-              onPressed: _handleLogout,
-            ),
-          ],
-        ),
-        body: ErrorView(
-          title: 'Access Restricted',
-          message:
-              'This dashboard is reserved for authenticated driver accounts.',
-          icon: Icons.gpp_maybe_rounded,
-          retryLabel: 'Return to Rider Home',
-          onRetry: () => AppNavigator.toRiderHome(context, user),
-        ),
-      );
-    }
-
-    final driverName = user.name.trim().isNotEmpty ? user.name : 'Driver';
-    final vehicleInfo = user.vehicleInfo?.trim().isNotEmpty == true
-        ? user.vehicleInfo!
-        : 'Vehicle details not available';
-    final hasVehicle = user.vehicleInfo?.trim().isNotEmpty == true;
-    final isVerified = user.isUnionVerified;
-    final isOnline = _availabilityController.isOnline;
-    final isUpdatingAvailability = _availabilityController.isUpdating;
+    final driverName = user?.name.isNotEmpty == true ? user!.name : 'Driver';
+    final vehicleInfo = user?.vehicleInfo?.isNotEmpty == true
+        ? user!.vehicleInfo!
+        : 'Vehicle details pending';
+    final isVerified = user?.isUnionVerified ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -223,8 +203,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 icon: Icon(
                   isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
                 ),
-                tooltip:
-                    isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
                 onPressed: () => ThemeController.toggleTheme(),
               );
             },
@@ -260,7 +239,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Driver Welcome / Identity Banner
+            // Driver Welcome Banner
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AppConstants.spaceXL),
@@ -296,8 +275,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    user.phoneNumber.isNotEmpty
-                        ? 'Driver Console • ${user.phoneNumber}'
+                    user?.phoneNumber.isNotEmpty == true
+                        ? 'Driver Console • ${user!.phoneNumber}'
                         : 'Union Fleet Operator & Driver Console',
                     style: const TextStyle(
                       fontSize: 14,
@@ -305,9 +284,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: AppConstants.spaceL),
-                  Wrap(
-                    spacing: AppConstants.spaceM,
-                    runSpacing: AppConstants.spaceS,
+                  Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -315,13 +292,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              AppConstants.primaryAmber.withValues(alpha: 0.2),
+                          color: AppConstants.primaryAmber.withValues(alpha: 0.2),
                           borderRadius:
                               BorderRadius.circular(AppConstants.radiusS),
                           border: Border.all(
-                            color: AppConstants.primaryAmber
-                                .withValues(alpha: 0.4),
+                            color:
+                                AppConstants.primaryAmber.withValues(alpha: 0.4),
                           ),
                         ),
                         child: const Row(
@@ -344,6 +320,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: AppConstants.spaceM),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppConstants.spaceM,
@@ -362,15 +339,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ),
                         ),
                         child: Text(
-                          isVerified
-                              ? 'Union Verified'
-                              : 'Pending Verification',
+                          isVerified ? 'Union Verified' : 'Pending Verification',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: isVerified
-                                ? Colors.greenAccent
-                                : Colors.orangeAccent,
+                            color: isVerified ? Colors.greenAccent : Colors.orangeAccent,
                           ),
                         ),
                       ),
@@ -379,44 +352,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: AppConstants.spaceXL),
-
-            // Registered Vehicle & Verification
-            Text(
-              'Vehicle & Union Status',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppConstants.spaceM),
-
-            InfoCard(
-              title: 'Registered Vehicle',
-              description: vehicleInfo,
-              icon: Icons.electric_rickshaw_rounded,
-              iconColor: AppConstants.primaryAmber,
-              badgeText: hasVehicle ? 'Registered' : 'Not Set',
-              badgeColor: hasVehicle ? Colors.blue : Colors.grey,
-            ),
-
-            InfoCard(
-              title: 'Union Verification Status',
-              description: isVerified
-                  ? 'Your union credentials and vehicle permit are fully verified.'
-                  : 'Document review in progress by regional union administrators.',
-              icon: isVerified
-                  ? Icons.verified_user_rounded
-                  : Icons.pending_actions_rounded,
-              iconColor: isVerified ? Colors.green : Colors.orange,
-              badgeText: isVerified ? 'Verified' : 'Pending',
-              badgeColor: isVerified ? Colors.green : Colors.orange,
-            ),
-            const SizedBox(height: AppConstants.spaceXL),
-
-            // Driver Operations Section
-            Text(
-              'Driver Operations',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppConstants.spaceM),
 
             // Driver Availability Card (Functional)
             Card(
@@ -425,7 +360,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppConstants.radiusL),
                 side: BorderSide(
-                  color: isOnline
+                  color: _availabilityController.isOnline
                       ? Colors.green.withValues(alpha: 0.5)
                       : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
@@ -440,17 +375,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: isOnline
+                            color: _availabilityController.isOnline
                                 ? Colors.green.withValues(alpha: 0.15)
                                 : theme.colorScheme.surfaceContainerHighest,
                             borderRadius:
                                 BorderRadius.circular(AppConstants.radiusM),
                           ),
                           child: Icon(
-                            isOnline
+                            _availabilityController.isOnline
                                 ? Icons.sensors_rounded
                                 : Icons.sensors_off_rounded,
-                            color: isOnline ? Colors.green : Colors.grey,
+                            color: _availabilityController.isOnline ? Colors.green : Colors.grey,
                             size: 24,
                           ),
                         ),
@@ -468,7 +403,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                isOnline
+                                _availabilityController.isOnline
                                     ? 'You are currently available for new rides.'
                                     : 'You are currently not available for new rides.',
                                 style: theme.textTheme.bodySmall?.copyWith(
@@ -485,21 +420,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: isOnline
+                            color: _availabilityController.isOnline
                                 ? Colors.green.withValues(alpha: 0.15)
                                 : Colors.grey.withValues(alpha: 0.15),
                             borderRadius:
                                 BorderRadius.circular(AppConstants.radiusPill),
                             border: Border.all(
-                              color: isOnline ? Colors.green : Colors.grey,
+                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
                             ),
                           ),
                           child: Text(
-                            isOnline ? 'Online' : 'Offline',
+                            _availabilityController.isOnline ? 'Online' : 'Offline',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: isOnline ? Colors.green : Colors.grey,
+                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
                             ),
                           ),
                         ),
@@ -509,18 +444,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: isUpdatingAvailability
+                        onPressed: _availabilityController.isUpdating
                             ? null
                             : _handleToggleAvailability,
                         style: FilledButton.styleFrom(
-                          backgroundColor: isOnline
+                          backgroundColor: _availabilityController.isOnline
                               ? Colors.red.shade700
                               : AppConstants.primaryAmber,
                           foregroundColor:
-                              isOnline ? Colors.white : Colors.black,
+                              _availabilityController.isOnline ? Colors.white : Colors.black,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        icon: isUpdatingAvailability
+                        icon: _availabilityController.isUpdating
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
@@ -532,14 +467,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                 ),
                               )
                             : Icon(
-                                isOnline
+                                _availabilityController.isOnline
                                     ? Icons.power_settings_new_rounded
                                     : Icons.bolt_rounded,
                               ),
                         label: Text(
-                          isUpdatingAvailability
+                          _availabilityController.isUpdating
                               ? 'Updating...'
-                              : (isOnline ? 'Go Offline' : 'Go Online'),
+                              : (_availabilityController.isOnline ? 'Go Offline' : 'Go Online'),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                           ),
@@ -550,25 +485,147 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 ),
               ),
             ),
+            
+            // DEBUG ONLY: Render the location sharing banner using a placeholder ride ID.
+            if (kDebugMode && Firebase.apps.isNotEmpty) ...[
+              const SizedBox(height: AppConstants.spaceM),
+              const LocationSharingStatusBanner(activeRideId: 'debug_ride_123'),
+            ],
+            
+            const SizedBox(height: AppConstants.spaceXL),
+
+            // Incoming Ride Requests Section Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Incoming Ride Requests',
+                  style: theme.textTheme.titleLarge,
+                ),
+                AnimatedBuilder(
+                  animation: _requestsController,
+                  builder: (context, _) {
+                    final count = _requestsController.requestCount;
+                    if (!_requestsController.isOnline || count == 0) {
+                      return const SizedBox.shrink();
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$count Active',
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             const SizedBox(height: AppConstants.spaceM),
 
-            const InfoCard(
-              title: 'Incoming Ride Requests',
-              description:
-                  'No incoming ride requests. Queue will update automatically when active.',
-              icon: Icons.hail_rounded,
-              iconColor: Colors.teal,
-              badgeText: 'No Requests',
-              badgeColor: Colors.grey,
+            // Incoming Ride Requests List / Content
+            AnimatedBuilder(
+              animation: _requestsController,
+              builder: (context, _) {
+                if (!_requestsController.isOnline) {
+                  return const EmptyStateView(
+                    title: 'Driver is Offline',
+                    message: 'Switch your availability to Online above to receive incoming ride requests.',
+                    icon: Icons.wifi_off_rounded,
+                  );
+                }
+
+                final state = _requestsController.state;
+
+                if (state.isLoading) {
+                  return const LoadingView(
+                    message: 'Checking incoming requests...',
+                  );
+                }
+
+                if (state.isError) {
+                  return ErrorView(
+                    message: state.message ?? 'Failed to load incoming requests.',
+                    onRetry: () => _requestsController.startListening(),
+                  );
+                }
+
+                if (state.isEmpty || state.data == null || state.data!.isEmpty) {
+                  return const EmptyStateView(
+                    title: 'No incoming ride requests',
+                    message: 'You are online. Eligible ride requests assigned to you will appear here automatically.',
+                    icon: Icons.inbox_rounded,
+                  );
+                }
+
+                final requests = state.data!;
+
+                return Column(
+                  children: requests.map((ride) {
+                    return RideSummaryCard(
+                      pickupAddress: ride.pickup.address.trim().isNotEmpty
+                          ? ride.pickup.address
+                          : 'Pickup address pending',
+                      dropoffAddress: ride.destination.address.trim().isNotEmpty
+                          ? ride.destination.address
+                          : 'Destination address pending',
+                      status: ride.status.name,
+                      dateTime: _formatDateTime(ride.createdAt),
+                      fare: '₹${ride.estimatedFare.toStringAsFixed(0)}',
+                      vehicleInfo: 'Vehicle: ${ride.vehicleType.name}',
+                      onTap: () {
+                        // Request detail preview / inspect action (PR 33 read-only)
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Inspecting request #${ride.id}. Accept/Reject actions active in PR 34/35.',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+                );
+              },
             ),
 
-            const InfoCard(
-              title: 'Current Ride',
-              description: 'No active ride in progress.',
-              icon: Icons.navigation_rounded,
-              iconColor: Colors.indigo,
-              badgeText: 'Inactive',
-              badgeColor: Colors.grey,
+            const SizedBox(height: AppConstants.spaceXL),
+
+            // Registered Vehicle Details
+            Text(
+              'Vehicle & Union Status',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppConstants.spaceM),
+
+            InfoCard(
+              title: 'Registered Vehicle',
+              description: vehicleInfo,
+              icon: Icons.electric_rickshaw_rounded,
+              iconColor: AppConstants.primaryAmber,
+              badgeText: 'Active',
+              badgeColor: Colors.blue,
+            ),
+
+            InfoCard(
+              title: 'Union Verification Status',
+              description: isVerified
+                  ? 'Your union credentials and vehicle permit are fully verified.'
+                  : 'Document review in progress by regional union administrators.',
+              icon: isVerified
+                  ? Icons.verified_user_rounded
+                  : Icons.pending_actions_rounded,
+              iconColor: isVerified ? Colors.green : Colors.orange,
+              badgeText: isVerified ? 'Verified' : 'Pending',
+              badgeColor: isVerified ? Colors.green : Colors.orange,
             ),
           ],
         ),

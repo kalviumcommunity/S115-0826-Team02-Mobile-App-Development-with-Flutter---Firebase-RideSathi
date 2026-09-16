@@ -80,6 +80,11 @@ void main() {
       expect(find.text('Driver Role Active'), findsOneWidget);
       expect(find.text('Pending Verification'), findsOneWidget);
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
+      expect(find.text('Registered Vehicle'), findsOneWidget);
+      expect(find.text('Union Verification Status'), findsOneWidget);
+      expect(find.text('Driver Availability'), findsOneWidget);
+      expect(find.text('Incoming Ride Requests'), findsOneWidget);
+      expect(find.text('Current Ride'), findsOneWidget);
 
     });
 
