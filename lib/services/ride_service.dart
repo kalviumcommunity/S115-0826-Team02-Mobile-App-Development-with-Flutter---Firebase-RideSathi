@@ -276,6 +276,80 @@ class RideService {
     return _assignDriverAtomically(rideId, driverId);
   }
 
+  /// Atomically reassigns a ride to a new driver.
+  /// 
+  /// The ride must be in an active state (`accepted`, `arrived`, `inProgress`).
+  /// Validates that the current driver is exactly as expected to prevent race conditions.
+  Future<void> reassignRide(String rideId, String expectedOldDriverId, String newDriverId) async {
+    if (rideId.trim().isEmpty) {
+      throw ArgumentError('Ride ID cannot be empty.');
+    }
+    if (expectedOldDriverId.trim().isEmpty) {
+      throw ArgumentError('Expected Old Driver ID cannot be empty.');
+    }
+    if (newDriverId.trim().isEmpty) {
+      throw ArgumentError('New Driver ID cannot be empty.');
+    }
+    if (expectedOldDriverId == newDriverId) {
+       throw const FirestoreException('Cannot reassign to the same driver.', code: 'invalid-argument');
+    }
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+      final newUserRef = _firestore.collection('users').doc(newDriverId.trim());
+
+      await _firestore.runTransaction((transaction) async {
+        // Read new user document for cross-document validation
+        final userSnap = await transaction.get(newUserRef);
+        if (!userSnap.exists) {
+          throw const FirestoreException('New driver profile not found.', code: 'not-found');
+        }
+        
+        final userData = userSnap.data();
+        if (userData == null || userData['isOnline'] != true) {
+           throw const FirestoreException('New driver is no longer online.', code: 'unavailable');
+        }
+
+        final snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists) {
+          throw const FirestoreException('Ride not found.', code: 'not-found');
+        }
+
+        final data = snapshot.data();
+        if (data == null) {
+          throw const FirestoreException('Ride data is corrupted.', code: 'data-corrupted');
+        }
+
+        // Validate that the ride is actually assigned to expectedOldDriverId
+        final currentDriverId = data['driverId'];
+        if (currentDriverId != expectedOldDriverId) {
+          throw const FirestoreException('Ride state has changed. Reassignment aborted.', code: 'aborted');
+        }
+
+        // Validate Status transition: only active states are allowed for reassignment.
+        final currentStatusStr = data['status'] as String?;
+        final allowedStates = [
+          RideStatus.accepted.name,
+          RideStatus.arrived.name,
+          RideStatus.inProgress.name,
+        ];
+        
+        if (currentStatusStr == null || !allowedStates.contains(currentStatusStr)) {
+          throw const FirestoreException('Ride is in an invalid state for reassignment.', code: 'invalid-state');
+        }
+
+        transaction.update(docRef, {
+          'driverId': newDriverId,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
+    }
+  }
+
 
   /// Atomically times out a ride request.
   /// 

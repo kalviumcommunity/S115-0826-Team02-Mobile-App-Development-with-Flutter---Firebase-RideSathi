@@ -8,6 +8,7 @@ import '../../models/ride_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
+import '../../services/ride_service.dart';
 
 /// A minimal dispatcher screen for validating Candidate Driver Discovery and
 /// Nearest Driver ranking (PR 40 + PR 41 validation surface).
@@ -16,10 +17,14 @@ import '../../widgets/loading_view.dart';
 /// Contains NO assignment, auto-dispatch, ETA, or map logic.
 class CandidateValidationScreen extends StatefulWidget {
   final RideModel ride;
+  final bool isReassignment;
+  final String? currentDriverId;
 
   const CandidateValidationScreen({
     super.key,
     required this.ride,
+    this.isReassignment = false,
+    this.currentDriverId,
   });
 
   @override
@@ -61,9 +66,36 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
     return '${km.toStringAsFixed(1)} km';
   }
 
+  Future<void> _assignDriver(String driverId) async {
+    final service = const RideService();
+    try {
+      if (widget.isReassignment) {
+        await service.reassignRide(widget.ride.id, widget.currentDriverId!, driverId);
+      } else {
+        // Explicit manual assignment overrides automatic assignment.
+        // We pause the auto-assigner just in case it's about to fire.
+        _assignmentController.dispose();
+        await service.assignRide(widget.ride.id, driverId);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully assigned to driver $driverId')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to assign driver: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final state = _controller.state;
+    final state = _fallbackController.state;
 
     return Scaffold(
       appBar: AppBar(
@@ -390,6 +422,20 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
                 Text(driver.activeRideId == null ? 'Available' : 'Occupied'),
               ],
             ),
+            if (isEligible) ...[
+              const SizedBox(height: AppConstants.spaceM),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _assignDriver(driver.id),
+                  icon: const Icon(Icons.assignment_ind),
+                  label: Text(widget.isReassignment ? 'Reassign to ${driver.name}' : 'Manually Assign'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
