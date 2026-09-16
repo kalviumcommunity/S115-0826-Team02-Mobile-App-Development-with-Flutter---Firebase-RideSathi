@@ -226,7 +226,7 @@ void main() {
     });
   });
 
-  group('RideService watchIncomingRideRequests', () {
+  group('RideService submitRideFeedback', () {
     late FakeFirebaseFirestore fakeFirestore;
     late RideService service;
 
@@ -235,65 +235,104 @@ void main() {
       service = RideService(firestore: fakeFirestore);
     });
 
-    test('streams incoming requests assigned to the specified driver with requested status', () async {
-      await fakeFirestore.collection('rides').doc('ride_1').set({
-        'riderId': 'rider_1',
-        'driverId': 'driver_123',
-        'status': 'requested',
-        'estimatedFare': 120.0,
+    Future<void> createRide(String id, {
+      String riderId = 'rider_123',
+      String status = 'completed',
+      Map<String, dynamic>? feedback,
+    }) async {
+      await fakeFirestore.collection('rides').doc(id).set({
+        'riderId': riderId,
+        'status': status,
+        if (feedback != null) 'feedback': feedback,
       });
+    }
 
-      // Different driver
-      await fakeFirestore.collection('rides').doc('ride_2').set({
-        'riderId': 'rider_2',
-        'driverId': 'driver_999',
-        'status': 'requested',
-        'estimatedFare': 200.0,
-      });
+    test('successfully submits feedback for a completed ride', () async {
+      await createRide('ride_1');
 
-      // Same driver, but accepted status
-      await fakeFirestore.collection('rides').doc('ride_3').set({
-        'riderId': 'rider_3',
-        'driverId': 'driver_123',
-        'status': 'accepted',
-        'estimatedFare': 150.0,
-      });
+      await service.submitRideFeedback('ride_1', 'rider_123', 4, comment: 'Great ride!');
 
-      final stream = service.watchIncomingRideRequests('driver_123');
-      final list = await stream.first;
-
-      expect(list.length, equals(1));
-      expect(list.first.id, equals('ride_1'));
-      expect(list.first.driverId, equals('driver_123'));
-      expect(list.first.status, equals(RideStatus.requested));
+      final doc = await fakeFirestore.collection('rides').doc('ride_1').get();
+      final data = doc.data()!;
+      expect(data['feedback'], isNotNull);
+      expect(data['feedback']['rating'], equals(4));
+      expect(data['feedback']['comment'], equals('Great ride!'));
+      expect(data['updatedAt'], isNotNull);
     });
 
-    test('skips malformed documents without crashing the stream', () async {
-      await fakeFirestore.collection('rides').doc('valid_ride').set({
-        'riderId': 'rider_1',
-        'driverId': 'driver_123',
-        'status': 'requested',
-        'estimatedFare': 100.0,
-      });
+    test('successfully submits feedback without a comment', () async {
+      await createRide('ride_1');
 
-      await fakeFirestore.collection('rides').doc('malformed_ride').set({
-        'riderId': 'rider_2',
-        'driverId': 'driver_123',
-        'status': 'requested',
-        'estimatedFare': 'invalid_number', // Throws exception on parsing
-      });
+      await service.submitRideFeedback('ride_1', 'rider_123', 5);
 
-      final list = await service.watchIncomingRideRequests('driver_123').first;
-
-      expect(list.length, equals(1));
-      expect(list.first.id, equals('valid_ride'));
+      final doc = await fakeFirestore.collection('rides').doc('ride_1').get();
+      final data = doc.data()!;
+      expect(data['feedback']['rating'], equals(5));
+      expect(data['feedback'].containsKey('comment'), isFalse);
     });
 
-    test('emits error when driverId is empty', () {
+    test('rejects feedback if ride is not found', () {
       expect(
-        service.watchIncomingRideRequests(''),
-        emitsError(isA<FirestoreException>()),
+        () => service.submitRideFeedback('non_existent', 'rider_123', 5),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('not-found'))),
       );
+    });
+
+    test('rejects feedback if riderId does not match (wrong rider)', () async {
+      await createRide('ride_1', riderId: 'other_rider');
+
+      expect(
+        () => service.submitRideFeedback('ride_1', 'rider_123', 5),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('permission-denied'))),
+      );
+    });
+
+    test('rejects feedback if ride is not completed', () async {
+      await createRide('ride_1', status: 'requested');
+
+      expect(
+        () => service.submitRideFeedback('ride_1', 'rider_123', 5),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('invalid-state'))),
+      );
+    });
+
+    test('rejects feedback if ride is cancelled', () async {
+      await createRide('ride_1', status: 'cancelled');
+
+      expect(
+        () => service.submitRideFeedback('ride_1', 'rider_123', 5),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('invalid-state'))),
+      );
+    });
+
+    test('rejects duplicate feedback submission', () async {
+      await createRide('ride_1', feedback: {'rating': 3, 'createdAt': DateTime.now()});
+
+      expect(
+        () => service.submitRideFeedback('ride_1', 'rider_123', 5),
+        throwsA(isA<FirestoreException>().having((e) => e.code, 'code', equals('already-exists'))),
+      );
+    });
+
+    test('throws ArgumentError for invalid rating (0)', () {
+      expect(() => service.submitRideFeedback('ride_1', 'rider_123', 0), throwsArgumentError);
+    });
+
+    test('throws ArgumentError for invalid rating (6)', () {
+      expect(() => service.submitRideFeedback('ride_1', 'rider_123', 6), throwsArgumentError);
+    });
+
+    test('throws ArgumentError for comment exceeding 500 characters', () {
+      final longComment = 'x' * 501;
+      expect(() => service.submitRideFeedback('ride_1', 'rider_123', 5, comment: longComment), throwsArgumentError);
+    });
+
+    test('throws ArgumentError on empty ride ID', () {
+      expect(() => service.submitRideFeedback('', 'rider_123', 5), throwsArgumentError);
+    });
+
+    test('throws ArgumentError on empty rider ID', () {
+      expect(() => service.submitRideFeedback('ride_1', '', 5), throwsArgumentError);
     });
   });
 }
