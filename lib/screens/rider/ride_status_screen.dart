@@ -198,6 +198,8 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             builder: (context, _) {
               final isLoading = _cancellationController.state.isLoading;
               final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled || ride.status == RideStatus.timedOut;
+              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled;
+              final actionTheme = Theme.of(context);
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -209,6 +211,44 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                       // Visual distinction for destructive action:
                       // Since CustomButton doesn't support a color override natively here, 
                       // we just rely on the confirmation dialog to be clearly destructive.
+                    ),
+                    const SizedBox(height: AppConstants.spaceM),
+                  ],
+                  if (ride.status == RideStatus.completed && ride.feedback == null) ...[
+                    CustomButton(
+                      label: 'Give Feedback',
+                      onPressed: () {
+                        AppNavigator.pushNamed(
+                          context,
+                          AppRoutes.riderFeedback,
+                          arguments: {'rideId': ride.id},
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppConstants.spaceM),
+                  ],
+                  if (ride.status == RideStatus.completed && ride.feedback != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: actionTheme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                        border: Border.all(color: actionTheme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 20, color: actionTheme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Feedback Submitted (${ride.feedback!.rating} ★)',
+                            style: actionTheme.textTheme.titleSmall?.copyWith(
+                              color: actionTheme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: AppConstants.spaceM),
                   ],
