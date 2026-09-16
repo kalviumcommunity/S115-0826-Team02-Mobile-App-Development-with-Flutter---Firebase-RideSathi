@@ -1,38 +1,35 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/state/auth_controller.dart';
-import '../../core/state/rider_ride_history_controller.dart';
-import '../../core/routes/app_routes.dart';
+import '../../core/state/driver_ride_history_controller.dart';
 import '../../models/ride_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/ride_history_card.dart';
 
-/// Screen for displaying the authenticated rider's ride history.
-class RiderRideHistoryScreen extends StatefulWidget {
-  final RiderRideHistoryController? controller;
+class DriverRideHistoryScreen extends StatefulWidget {
+  final DriverRideHistoryController? controller;
   
-  const RiderRideHistoryScreen({
+  const DriverRideHistoryScreen({
     super.key,
     this.controller,
   });
 
   @override
-  State<RiderRideHistoryScreen> createState() => _RiderRideHistoryScreenState();
+  State<DriverRideHistoryScreen> createState() => _DriverRideHistoryScreenState();
 }
 
-class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
-  late final RiderRideHistoryController _controller;
+class _DriverRideHistoryScreenState extends State<DriverRideHistoryScreen> {
+  late final DriverRideHistoryController _controller;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ?? RiderRideHistoryController();
+    _controller = widget.controller ?? DriverRideHistoryController();
     _controller.addListener(_onStateChanged);
     _scrollController.addListener(_onScroll);
     
-    // Defer the load slightly so it doesn't block the initial frame/animation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controller.loadHistory(refresh: true);
     });
@@ -84,10 +81,6 @@ class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
           child: const Text('Cancelled', style: TextStyle(color: Colors.white)),
         ),
         DropdownMenuItem<RideStatus?>(
-          value: RideStatus.timedOut,
-          child: const Text('Timed Out', style: TextStyle(color: Colors.white)),
-        ),
-        DropdownMenuItem<RideStatus?>(
           value: RideStatus.rejected,
           child: const Text('Rejected', style: TextStyle(color: Colors.white)),
         ),
@@ -101,7 +94,7 @@ class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ride History'),
+        title: const Text('My Ride History'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: AppConstants.spaceM),
@@ -124,7 +117,7 @@ class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
                 icon: Icons.history_rounded,
                 title: 'No rides found',
                 description: _controller.currentStatusFilter == null 
-                  ? 'You haven\'t taken any rides yet.'
+                  ? 'You haven\'t completed any rides yet.'
                   : 'No rides match the selected filter.',
               );
             }
@@ -144,18 +137,7 @@ class _RiderRideHistoryScreenState extends State<RiderRideHistoryScreen> {
                   }
 
                   final ride = history[index];
-                  return RideHistoryCard(
-                    ride: ride,
-                    onTap: (ride.status == RideStatus.completed && ride.feedback == null)
-                        ? () {
-                            AppNavigator.pushNamed(
-                              context,
-                              AppRoutes.riderFeedback,
-                              arguments: {'rideId': ride.id},
-                            ).then((_) => _controller.loadHistory(refresh: true));
-                          }
-                        : null,
-                  );
+                  return RideHistoryCard(ride: ride);
                 },
               ),
             );

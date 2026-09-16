@@ -6,7 +6,7 @@ import '../../services/firestore_exception.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
-class RiderRideHistoryController extends ChangeNotifier {
+class DispatcherHistoryController extends ChangeNotifier {
   final RideService _rideService;
   final AuthController _authController;
 
@@ -17,9 +17,19 @@ class RiderRideHistoryController extends ChangeNotifier {
   DocumentSnapshot? _lastDoc;
   final List<RideModel> _rides = [];
   bool _isLoadingMore = false;
-  RideStatus? _currentStatusFilter;
+  
+  // Filters
+  RideStatus? _statusFilter;
+  String? _driverIdFilter;
+  String? _riderIdFilter;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  
+  // Local Search (Applies over the fetched pages)
+  String _searchQuery = '';
+  List<RideModel> _filteredRides = [];
 
-  RiderRideHistoryController({
+  DispatcherHistoryController({
     RideService? rideService,
     AuthController? authController,
   })  : _rideService = rideService ?? RideService(),
@@ -28,17 +38,15 @@ class RiderRideHistoryController extends ChangeNotifier {
   ViewState<List<RideModel>> get state => _state;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
-  RideStatus? get currentStatusFilter => _currentStatusFilter;
+  
+  RideStatus? get statusFilter => _statusFilter;
+  DateTime? get startDate => _startDate;
+  DateTime? get endDate => _endDate;
+  String get searchQuery => _searchQuery;
 
-  Future<void> loadHistory({bool refresh = false, RideStatus? status}) async {
+  Future<void> loadHistory({bool refresh = false}) async {
     if (_isDisposed) return;
     
-    // If it's a new status filter, force refresh
-    if (status != _currentStatusFilter) {
-      _currentStatusFilter = status;
-      refresh = true;
-    }
-
     if (refresh) {
       _hasMore = true;
       _lastDoc = null;
@@ -50,20 +58,17 @@ class RiderRideHistoryController extends ChangeNotifier {
       notifyListeners();
     }
 
-    final currentUser = _authController.currentUser;
-    if (currentUser == null) {
-      _setState(const ViewState.error('User is not authenticated.'));
-      return;
-    }
-
     final currentGeneration = _authController.sessionGeneration;
 
     try {
-      final page = await _rideService.getRiderRideHistory(
-        currentUser.id,
+      final page = await _rideService.getDispatcherRideHistory(
         limit: 20,
         startAfter: _lastDoc,
-        status: _currentStatusFilter,
+        status: _statusFilter,
+        driverId: _driverIdFilter,
+        riderId: _riderIdFilter,
+        startDate: _startDate,
+        endDate: _endDate,
       );
 
       if (_isDisposed || _authController.sessionGeneration != currentGeneration) {
@@ -75,11 +80,11 @@ class RiderRideHistoryController extends ChangeNotifier {
       } else {
         _rides.addAll(page.rides);
         _lastDoc = page.lastDocument;
-        _hasMore = page.rides.length == 20; // Assuming limit is 20
+        _hasMore = page.rides.length == 20; 
       }
 
       _isLoadingMore = false;
-      _setState(ViewState.success(List.unmodifiable(_rides)));
+      _applyLocalSearch();
     } on FirestoreException catch (e) {
       if (_isDisposed || _authController.sessionGeneration != currentGeneration) return;
       _isLoadingMore = false;
@@ -91,21 +96,51 @@ class RiderRideHistoryController extends ChangeNotifier {
     }
   }
 
-  void setFilter(RideStatus? status) {
-    if (_currentStatusFilter != status) {
-      loadHistory(refresh: true, status: status);
+  void setFilters({
+    RideStatus? status,
+    String? driverId,
+    String? riderId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    _statusFilter = status;
+    _driverIdFilter = driverId;
+    _riderIdFilter = riderId;
+    _startDate = startDate;
+    _endDate = endDate;
+    loadHistory(refresh: true);
+  }
+  
+  void clearFilters() {
+    _statusFilter = null;
+    _driverIdFilter = null;
+    _riderIdFilter = null;
+    _startDate = null;
+    _endDate = null;
+    _searchQuery = '';
+    loadHistory(refresh: true);
+  }
+
+  void setSearchQuery(String query) {
+    if (_searchQuery != query) {
+      _searchQuery = query;
+      _applyLocalSearch();
     }
   }
 
-  void clear() {
-    if (!_isDisposed) {
-      _rides.clear();
-      _lastDoc = null;
-      _hasMore = true;
-      _isLoadingMore = false;
-      _currentStatusFilter = null;
-      _setState(const ViewState.initial());
+  void _applyLocalSearch() {
+    if (_searchQuery.trim().isEmpty) {
+      _filteredRides = List.unmodifiable(_rides);
+    } else {
+      final q = _searchQuery.trim().toLowerCase();
+      _filteredRides = _rides.where((ride) {
+        final pickupMatch = ride.pickup.displayName?.toLowerCase().contains(q) ?? false;
+        final destMatch = ride.destination.displayName?.toLowerCase().contains(q) ?? false;
+        final idMatch = ride.id.toLowerCase().contains(q);
+        return pickupMatch || destMatch || idMatch;
+      }).toList();
     }
+    _setState(ViewState.success(List.unmodifiable(_filteredRides)));
   }
 
   void _setState(ViewState<List<RideModel>> newState) {

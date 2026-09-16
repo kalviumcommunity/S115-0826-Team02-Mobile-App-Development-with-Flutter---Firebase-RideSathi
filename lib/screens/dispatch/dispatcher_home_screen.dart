@@ -12,6 +12,8 @@ import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/status_badge.dart';
 import '../../core/routes/app_routes.dart';
+import 'dispatcher_history_screen.dart';
+import 'dispatcher_analytics_screen.dart';
 
 class DispatcherHomeScreen extends StatefulWidget {
   final AuthController authController;
@@ -88,6 +90,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
           _buildRequestedRidesTab(),
           _buildActiveRidesTab(),
           _buildDriversTab(),
+          const DispatcherHistoryScreen(),
+          const DispatcherAnalyticsScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -104,11 +108,19 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
           ),
           NavigationDestination(
             icon: Icon(Icons.directions_car_rounded),
-            label: 'Active Rides',
+            label: 'Active',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_rounded),
             label: 'Drivers',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_rounded),
+            label: 'History',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.analytics_rounded),
+            label: 'Analytics',
           ),
         ],
       ),

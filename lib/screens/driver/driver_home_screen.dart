@@ -300,6 +300,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'History',
+            onPressed: () => AppNavigator.pushNamed(context, AppRoutes.driverHistory),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline_rounded),
             tooltip: 'Profile',
             onPressed: () => AppNavigator.toProfile(context),

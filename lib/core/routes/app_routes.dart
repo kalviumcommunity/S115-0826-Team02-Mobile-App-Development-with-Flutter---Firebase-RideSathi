@@ -7,6 +7,7 @@ import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
 import '../../screens/driver/driver_active_ride_screen.dart';
 import '../../screens/driver/driver_home_screen.dart';
+import '../../screens/driver/driver_ride_history_screen.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/profile/profile_screen.dart';
 import '../../screens/rider/location_search_screen.dart';
@@ -58,6 +59,7 @@ class AppRoutes {
   static const String riderFeedback = '/rider/feedback';
 
   // Reserved Future Role Route
+  static const String driverHistory = '/driver/history';
   static const String dispatcherHome = '/dispatcher/home';
   static const String dispatcherDriverData = '/dispatcher/driver-data';
   static const String dispatcherCandidates = '/dispatcher/candidates';
@@ -240,6 +242,15 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => ProfileScreen(authController: controller),
+          settings: settings,
+        );
+        
+      case driverHistory:
+        if (!isAuthenticated || userRole != UserRole.driver) {
+          return _buildAccessErrorRoute(settings, 'Unauthorized. Driver access required.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => const DriverRideHistoryScreen(),
           settings: settings,
         );
 
