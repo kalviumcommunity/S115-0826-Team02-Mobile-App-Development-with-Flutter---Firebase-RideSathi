@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/profile_controller.dart';
@@ -148,6 +150,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _formKey.currentState?.reset();
   }
 
+  final ImagePicker _imagePicker = ImagePicker();
+
+  Future<void> _pickProfileImage() async {
+    final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (image != null) {
+      await _profileController.uploadProfileImage(File(image.path));
+    }
+  }
+
+  Future<void> _pickDriverDocument() async {
+    final XFile? doc = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (doc != null) {
+      await _profileController.uploadDriverDocument(File(doc.path));
+    }
+  }
+
   Future<bool> _onWillPop() async {
     if (!_profileController.isDirty) {
       return true;
@@ -248,21 +266,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Column(
                     children: [
-                      CircleAvatar(
-                        radius: 38,
-                        backgroundColor: isDriver
-                            ? AppConstants.primaryAmber
-                            : theme.colorScheme.primary,
-                        foregroundColor: isDriver
-                            ? Colors.black
-                            : theme.colorScheme.onPrimary,
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundColor: isDriver
+                                ? AppConstants.primaryAmber
+                                : theme.colorScheme.primary,
+                            foregroundColor: isDriver
+                                ? Colors.black
+                                : theme.colorScheme.onPrimary,
+                            backgroundImage: user.profileImageUrl != null
+                                ? NetworkImage(user.profileImageUrl!)
+                                : null,
+                            child: user.profileImageUrl == null
+                                ? Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
                           ),
-                        ),
+                          if (_profileController.isUploadingMedia)
+                            const Positioned.fill(
+                              child: CircularProgressIndicator(),
+                            ),
+                          Positioned(
+                            right: -4,
+                            bottom: -4,
+                            child: IconButton(
+                              icon: const Icon(Icons.camera_alt, size: 20, color: Colors.white),
+                              style: IconButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary,
+                                padding: const EdgeInsets.all(4),
+                              ),
+                              onPressed: _profileController.isUploadingMedia ? null : _pickProfileImage,
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: AppConstants.spaceM),
                       Text(
@@ -472,6 +516,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spaceL),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppConstants.spaceL),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Driver Documents',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppConstants.spaceS),
+                        Row(
+                          children: [
+                            Icon(
+                              user.driverDocumentUrl != null ? Icons.check_circle : Icons.upload_file,
+                              color: user.driverDocumentUrl != null ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                user.driverDocumentUrl != null
+                                    ? 'Registration document uploaded.'
+                                    : 'Upload vehicle registration or license.',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: _profileController.isUploadingMedia ? null : _pickDriverDocument,
+                              icon: const Icon(Icons.upload),
+                              label: Text(user.driverDocumentUrl != null ? 'Replace' : 'Upload'),
+                            ),
+                          ],
                         ),
                       ],
                     ),

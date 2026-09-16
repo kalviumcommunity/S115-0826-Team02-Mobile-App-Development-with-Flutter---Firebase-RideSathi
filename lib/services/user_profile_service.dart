@@ -99,6 +99,8 @@ class UserProfileService {
     'name',
     'phoneNumber',
     'vehicleInfo',
+    'profileImageUrl',
+    'driverDocumentUrl',
   };
 
   /// Disallowed immutable and domain-protected field keys.

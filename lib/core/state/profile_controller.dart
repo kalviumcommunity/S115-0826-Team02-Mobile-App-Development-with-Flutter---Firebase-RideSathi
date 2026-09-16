@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_exception.dart';
+import '../../services/profile_media_service.dart';
+import '../../services/storage_exception.dart';
 import '../../services/user_profile_service.dart';
 import '../utils/validators.dart';
 import 'auth_controller.dart';
@@ -13,11 +16,13 @@ import 'view_state.dart';
 class ProfileController extends ChangeNotifier {
   final AuthController _authController;
   final UserProfileService _userProfileService;
+  final ProfileMediaService _profileMediaService;
 
   ViewState<UserModel> _state;
   UserModel? _originalUser;
   bool _isSaving = false;
   bool _isDisposed = false;
+  bool _isUploadingMedia = false;
 
   String _name = '';
   String _phoneNumber = '';
@@ -26,11 +31,13 @@ class ProfileController extends ChangeNotifier {
   ProfileController({
     AuthController? authController,
     UserProfileService? userProfileService,
+    ProfileMediaService? profileMediaService,
     UserModel? initialUser,
   })  : _authController = authController ?? AuthController.instance,
         _userProfileService = userProfileService ??
             authController?.userProfileService ??
             const UserProfileService(),
+        _profileMediaService = profileMediaService ?? const ProfileMediaService(),
         _state = initialUser != null
             ? ViewState.success(initialUser)
             : (authController?.currentUser != null
@@ -305,9 +312,91 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
+  bool get isUploadingMedia => _isUploadingMedia;
+
+  /// Uploads a new profile image.
+  Future<void> uploadProfileImage(File imageFile) async {
+    final activeUser = _authController.currentUser;
+    if (activeUser == null) return;
+    
+    _isUploadingMedia = true;
+    _state = ViewState.loading(previousData: _originalUser);
+    notifyListeners();
+
+    try {
+      final url = await _profileMediaService.uploadProfileImage(activeUser.id, imageFile);
+      
+      // Update Firestore
+      final sessionGen = _authController.sessionGeneration;
+      final fresh = await _userProfileService.updateProfile(
+        uid: activeUser.id,
+        updates: {'profileImageUrl': url},
+      );
+
+      if (!_isDisposed && _authController.sessionGeneration == sessionGen) {
+        _authController.updateCurrentUser(fresh, expectedGeneration: sessionGen);
+        initialize(fresh);
+        _state = ViewState.success(fresh, message: 'Profile image updated successfully.');
+      }
+    } on StorageException catch (e) {
+      if (!_isDisposed) {
+        _state = ViewState.error(e.message, previousData: _originalUser);
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        _state = ViewState.error('Failed to upload image.', previousData: _originalUser);
+      }
+    } finally {
+      if (!_isDisposed) {
+        _isUploadingMedia = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Uploads a driver document (for drivers only).
+  Future<void> uploadDriverDocument(File documentFile) async {
+    final activeUser = _authController.currentUser;
+    if (activeUser == null || activeUser.role != UserRole.driver) return;
+    
+    _isUploadingMedia = true;
+    _state = ViewState.loading(previousData: _originalUser);
+    notifyListeners();
+
+    try {
+      final url = await _profileMediaService.uploadDriverDocument(activeUser.id, 'registration_doc', documentFile);
+      
+      final sessionGen = _authController.sessionGeneration;
+      final fresh = await _userProfileService.updateProfile(
+        uid: activeUser.id,
+        updates: {'driverDocumentUrl': url},
+      );
+
+      if (!_isDisposed && _authController.sessionGeneration == sessionGen) {
+        _authController.updateCurrentUser(fresh, expectedGeneration: sessionGen);
+        initialize(fresh);
+        _state = ViewState.success(fresh, message: 'Document uploaded successfully.');
+      }
+    } on StorageException catch (e) {
+      if (!_isDisposed) {
+        _state = ViewState.error(e.message, previousData: _originalUser);
+      }
+    } catch (e) {
+      if (!_isDisposed) {
+        _state = ViewState.error('Failed to upload document.', previousData: _originalUser);
+      }
+    } finally {
+      if (!_isDisposed) {
+        _isUploadingMedia = false;
+        notifyListeners();
+      }
+    }
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
+    _profileMediaService; // no-op, just indicating it's freed
     super.dispose();
   }
 }

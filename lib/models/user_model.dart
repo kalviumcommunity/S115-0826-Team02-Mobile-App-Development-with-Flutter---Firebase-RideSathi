@@ -29,9 +29,10 @@ class UserModel {
   final bool isUnionVerified;
   final bool isOnline;
   final String? vehicleInfo;
-  final bool isOnline;
+  final String? profileImageUrl;
+  final String? driverDocumentUrl;
   final DateTime? availabilityUpdatedAt;
-  final DateTime createdAt;
+  final DateTime? createdAt;
   final DateTime? updatedAt;
 
   const UserModel({
@@ -43,9 +44,10 @@ class UserModel {
     this.isUnionVerified = false,
     this.isOnline = false,
     this.vehicleInfo,
-    this.isOnline = false,
+    this.profileImageUrl,
+    this.driverDocumentUrl,
     this.availabilityUpdatedAt,
-    required this.createdAt,
+    this.createdAt,
     this.updatedAt,
   });
 
@@ -59,9 +61,10 @@ class UserModel {
       'isUnionVerified': isUnionVerified,
       'isOnline': isOnline,
       'vehicleInfo': vehicleInfo,
-      'isOnline': isOnline,
+      'profileImageUrl': profileImageUrl,
+      'driverDocumentUrl': driverDocumentUrl,
       if (availabilityUpdatedAt != null) 'availabilityUpdatedAt': availabilityUpdatedAt!.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
+      if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
     };
   }
@@ -89,15 +92,16 @@ class UserModel {
       isUnionVerified: parsedVerified,
       isOnline: parsedOnline,
       vehicleInfo: map['vehicleInfo'] as String?,
-      isOnline: map['isOnline'] as bool? ?? false,
+      profileImageUrl: map['profileImageUrl'] as String?,
+      driverDocumentUrl: map['driverDocumentUrl'] as String?,
       availabilityUpdatedAt: map['availabilityUpdatedAt'] != null
           ? (map['availabilityUpdatedAt'] is String
               ? DateTime.tryParse(map['availabilityUpdatedAt'] as String)
               : null)
           : null,
       createdAt: map['createdAt'] != null
-          ? (map['createdAt'] is String ? DateTime.parse(map['createdAt'] as String) : DateTime.now())
-          : DateTime.now(),
+          ? (map['createdAt'] is String ? DateTime.tryParse(map['createdAt'] as String) : null)
+          : null,
       updatedAt: map['updatedAt'] != null
           ? (map['updatedAt'] is String ? DateTime.tryParse(map['updatedAt'] as String) : null)
           : null,
@@ -113,7 +117,8 @@ class UserModel {
     bool? isUnionVerified,
     bool? isOnline,
     String? vehicleInfo,
-    bool? isOnline,
+    String? profileImageUrl,
+    String? driverDocumentUrl,
     DateTime? availabilityUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -127,7 +132,8 @@ class UserModel {
       isUnionVerified: isUnionVerified ?? this.isUnionVerified,
       isOnline: isOnline ?? this.isOnline,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
-      isOnline: isOnline ?? this.isOnline,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      driverDocumentUrl: driverDocumentUrl ?? this.driverDocumentUrl,
       availabilityUpdatedAt: availabilityUpdatedAt ?? this.availabilityUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
