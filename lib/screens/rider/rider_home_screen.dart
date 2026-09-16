@@ -178,14 +178,17 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                 ),
               ),
               const SizedBox(height: AppConstants.spaceXXL),
-              const SectionHeader(title: 'Current Ride'),
+              const SectionHeader(
+                title: 'Get Started',
+                subtitle: 'Request a ride whenever you need one.',
+              ),
               const SizedBox(height: AppConstants.spaceM),
               const EmptyStateView(
                 icon: Icons.local_taxi_rounded,
                 title: 'No active ride',
                 description:
-                    "You don't have an active ride right now. Request a ride "
-                    "when you're ready to travel.",
+                    "You don't have an active ride. Tap 'Request a Ride' above to get going, "
+                    "or view your past rides in History.",
               ),
             ],
           ),
