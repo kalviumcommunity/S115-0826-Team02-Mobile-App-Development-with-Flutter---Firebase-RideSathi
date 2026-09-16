@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
+import 'package:ridesathi/core/state/driver_availability_controller.dart';
 import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/widgets/error_view.dart';
@@ -12,16 +13,24 @@ import 'package:ridesathi/widgets/union_badge.dart';
 /// Primary landing and operational dashboard screen for authenticated Drivers in RideSathi.
 ///
 /// Displays driver identity, registered vehicle details, union verification status,
-/// future operational section shells (availability, requests, current ride), and supports
-/// clean logout with navigation stack clearing.
+/// explicit online/offline availability control, future operational shells (requests, current ride),
+/// and supports clean logout with navigation stack clearing.
 class DriverHomeScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
 
+  /// Optional [DriverAvailabilityController] for dependency injection in tests.
+  final DriverAvailabilityController? availabilityController;
+
   /// Optional [UserModel] for explicit user identity passing.
   final UserModel? user;
 
-  const DriverHomeScreen({super.key, this.authController, this.user});
+  const DriverHomeScreen({
+    super.key,
+    this.authController,
+    this.availabilityController,
+    this.user,
+  });
 
   @override
   State<DriverHomeScreen> createState() => _DriverHomeScreenState();
@@ -29,12 +38,47 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final AuthController _authController;
+  late final DriverAvailabilityController _availabilityController;
   bool _isLoggingOut = false;
 
   @override
   void initState() {
     super.initState();
     _authController = widget.authController ?? AuthController.instance;
+    _availabilityController = widget.availabilityController ??
+        DriverAvailabilityController(authController: _authController);
+
+    _availabilityController.addListener(_onAvailabilityStateChanged);
+  }
+
+  @override
+  void dispose() {
+    _availabilityController.removeListener(_onAvailabilityStateChanged);
+    if (widget.availabilityController == null) {
+      _availabilityController.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onAvailabilityStateChanged() {
+    if (!mounted) return;
+    if (_availabilityController.state.isError) {
+      final errorMessage = _availabilityController.errorMessage ??
+          'Failed to update availability.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _availabilityController.toggleAvailability(),
+          ),
+        ),
+      );
+      _availabilityController.clearError();
+    } else {
+      setState(() {});
+    }
   }
 
   UserModel? get _currentUser => widget.user ?? _authController.currentUser;
@@ -65,6 +109,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       );
       _authController.clearError();
     }
+  }
+
+  Future<void> _handleToggleAvailability() async {
+    await _availabilityController.toggleAvailability();
   }
 
   @override
@@ -140,6 +188,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         : 'Vehicle details not available';
     final hasVehicle = user.vehicleInfo?.trim().isNotEmpty == true;
     final isVerified = user.isUnionVerified;
+    final isOnline = _availabilityController.isOnline;
+    final isUpdatingAvailability = _availabilityController.isUpdating;
 
     return Scaffold(
       appBar: AppBar(
@@ -361,22 +411,146 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
             const SizedBox(height: AppConstants.spaceXL),
 
-            // Driver Operations Section (Future Feature Shells)
+            // Driver Operations Section
             Text(
               'Driver Operations',
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: AppConstants.spaceM),
 
-            const InfoCard(
-              title: 'Driver Availability',
-              description:
-                  'Ride availability controls will appear here.',
-              icon: Icons.toggle_off_rounded,
-              iconColor: Colors.grey,
-              badgeText: 'Offline',
-              badgeColor: Colors.grey,
+            // Driver Availability Card (Functional)
+            Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                side: BorderSide(
+                  color: isOnline
+                      ? Colors.green.withValues(alpha: 0.5)
+                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppConstants.spaceL),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isOnline
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : theme.colorScheme.surfaceContainerHighest,
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusM),
+                          ),
+                          child: Icon(
+                            isOnline
+                                ? Icons.sensors_rounded
+                                : Icons.sensors_off_rounded,
+                            color: isOnline ? Colors.green : Colors.grey,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: AppConstants.spaceM),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Driver Availability',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isOnline
+                                    ? 'You are currently available for new rides.'
+                                    : 'You are currently not available for new rides.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: AppConstants.spaceS),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isOnline
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.grey.withValues(alpha: 0.15),
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusPill),
+                            border: Border.all(
+                              color: isOnline ? Colors.green : Colors.grey,
+                            ),
+                          ),
+                          child: Text(
+                            isOnline ? 'Online' : 'Offline',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isOnline ? Colors.green : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppConstants.spaceM),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: isUpdatingAvailability
+                            ? null
+                            : _handleToggleAvailability,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: isOnline
+                              ? Colors.red.shade700
+                              : AppConstants.primaryAmber,
+                          foregroundColor:
+                              isOnline ? Colors.white : Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: isUpdatingAvailability
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isOnline
+                                    ? Icons.power_settings_new_rounded
+                                    : Icons.bolt_rounded,
+                              ),
+                        label: Text(
+                          isUpdatingAvailability
+                              ? 'Updating...'
+                              : (isOnline ? 'Go Offline' : 'Go Online'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+            const SizedBox(height: AppConstants.spaceM),
 
             const InfoCard(
               title: 'Incoming Ride Requests',

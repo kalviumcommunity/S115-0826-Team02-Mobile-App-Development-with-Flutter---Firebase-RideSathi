@@ -27,6 +27,7 @@ class UserModel {
   final String? email;
   final UserRole role;
   final bool isUnionVerified;
+  final bool isOnline;
   final String? vehicleInfo;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -38,6 +39,7 @@ class UserModel {
     this.email,
     required this.role,
     this.isUnionVerified = false,
+    this.isOnline = false,
     this.vehicleInfo,
     required this.createdAt,
     this.updatedAt,
@@ -51,6 +53,7 @@ class UserModel {
       'email': email,
       'role': role.name,
       'isUnionVerified': isUnionVerified,
+      'isOnline': isOnline,
       'vehicleInfo': vehicleInfo,
       'createdAt': createdAt.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
@@ -68,6 +71,9 @@ class UserModel {
     final rawVerified = map['isUnionVerified'];
     final bool parsedVerified = rawVerified is bool ? rawVerified : false;
 
+    final rawOnline = map['isOnline'];
+    final bool parsedOnline = rawOnline is bool ? rawOnline : false;
+
     return UserModel(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
@@ -75,6 +81,7 @@ class UserModel {
       email: map['email'] as String?,
       role: parsedRole,
       isUnionVerified: parsedVerified,
+      isOnline: parsedOnline,
       vehicleInfo: map['vehicleInfo'] as String?,
       createdAt: map['createdAt'] != null
           ? DateTime.parse(map['createdAt'] as String)
@@ -92,6 +99,7 @@ class UserModel {
     String? email,
     UserRole? role,
     bool? isUnionVerified,
+    bool? isOnline,
     String? vehicleInfo,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -103,10 +111,10 @@ class UserModel {
       email: email ?? this.email,
       role: role ?? this.role,
       isUnionVerified: isUnionVerified ?? this.isUnionVerified,
+      isOnline: isOnline ?? this.isOnline,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-
