@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/state/automatic_assignment_controller.dart';
+import '../../core/state/fallback_matching_controller.dart';
 import '../../core/state/nearest_driver_controller.dart';
 import '../../models/candidate_evaluation.dart';
 import '../../models/ride_model.dart';
@@ -26,22 +28,28 @@ class CandidateValidationScreen extends StatefulWidget {
 }
 
 class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
-  late final FallbackMatchingController _controller;
+  late final FallbackMatchingController _fallbackController;
+  late final AutomaticAssignmentController _assignmentController;
 
   @override
   void initState() {
     super.initState();
-    _controller = FallbackMatchingController();
-    _controller.addListener(_onStateChanged);
-    _controller.startListening(widget.ride);
+    _fallbackController = FallbackMatchingController();
+    _fallbackController.addListener(_onStateChanged);
+    
+    _assignmentController = AutomaticAssignmentController(fallbackController: _fallbackController);
+    _assignmentController.setRideId(widget.ride.id);
+    
+    _fallbackController.startListening(widget.ride);
   }
 
   void _onStateChanged() => setState(() {});
 
   @override
   void dispose() {
-    _controller.removeListener(_onStateChanged);
-    _controller.dispose();
+    _fallbackController.removeListener(_onStateChanged);
+    _assignmentController.dispose();
+    _fallbackController.dispose();
     super.dispose();
   }
 

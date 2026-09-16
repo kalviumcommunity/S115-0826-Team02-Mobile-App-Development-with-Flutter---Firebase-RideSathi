@@ -24,6 +24,12 @@ enum MatchingAttemptStatus {
   
   /// An error occurred in the stream.
   error,
+  
+  /// Currently attempting an authoritative assignment transaction.
+  assigning,
+  
+  /// Assignment succeeded.
+  assigned,
 }
 
 /// A lightweight state representation for a matching attempt.
