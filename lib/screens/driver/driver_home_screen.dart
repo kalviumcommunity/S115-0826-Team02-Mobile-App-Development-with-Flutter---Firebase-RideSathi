@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/state/incoming_ride_requests_controller.dart';
+import '../../core/state/ride_acceptance_controller.dart';
 import '../../core/state/driver_availability_controller.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../models/ride_model.dart';
@@ -28,6 +29,9 @@ class DriverHomeScreen extends StatefulWidget {
   /// Optional [IncomingRideRequestsController] for dependency injection in tests.
   final IncomingRideRequestsController? requestsController;
 
+  /// Optional [RideAcceptanceController] for dependency injection in tests.
+  final RideAcceptanceController? acceptanceController;
+
   /// Optional [DriverAvailabilityController] for dependency injection in tests.
   final DriverAvailabilityController? availabilityController;
 
@@ -38,6 +42,7 @@ class DriverHomeScreen extends StatefulWidget {
     super.key,
     this.authController,
     this.requestsController,
+    this.acceptanceController,
     this.availabilityController,
     this.user,
   });
@@ -49,9 +54,11 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   late final AuthController _authController;
   late final IncomingRideRequestsController _requestsController;
+  late final RideAcceptanceController _acceptanceController;
   late final DriverAvailabilityController _availabilityController;
   bool _isLoggingOut = false;
   bool _ownsRequestsController = false;
+  bool _ownsAcceptanceController = false;
 
   @override
   void initState() {
@@ -66,7 +73,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         authController: _authController,
       );
       _ownsRequestsController = true;
+    if (widget.acceptanceController != null) {
+      _acceptanceController = widget.acceptanceController!;
+      _ownsAcceptanceController = false;
+    } else {
+      _acceptanceController = RideAcceptanceController(
+        authController: _authController,
+        requestsController: _requestsController,
+      );
+      _ownsAcceptanceController = true;
     }
+
+    _acceptanceController.addListener(_onAcceptanceStateChanged);
 
     _availabilityController = widget.availabilityController ??
         DriverAvailabilityController(authController: _authController);
@@ -74,8 +92,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     _availabilityController.addListener(_onAvailabilityStateChanged);
   }
 
+  void _onAcceptanceStateChanged() {
+    final state = _acceptanceController.state;
+    if (state.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Ride accepted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (state.isError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Failed to accept ride.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _acceptanceController.clearError();
+    }
+  }
+
   @override
   void dispose() {
+    _acceptanceController.removeListener(_onAcceptanceStateChanged);
+    if (_ownsAcceptanceController) {
+      _acceptanceController.dispose();
+    }
     _availabilityController.removeListener(_onAvailabilityStateChanged);
     if (widget.availabilityController == null) {
       _availabilityController.dispose();
@@ -591,6 +633,42 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ),
                         );
                       },
+                      actionButton: AnimatedBuilder(
+                        animation: _acceptanceController,
+                        builder: (context, _) {
+                          final isLoading = _acceptanceController.state.isLoading;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: isLoading
+                                  ? null
+                                  : () => _acceptanceController.acceptRide(ride.id),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                                ),
+                              ),
+                              icon: isLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle_outline_rounded),
+                              label: Text(
+                                isLoading ? 'Accepting...' : 'Accept Ride',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     );
                   }).toList(),
                 );
