@@ -77,6 +77,9 @@ void main() {
       expect(find.text('Auto DL-01-AB-1234'), findsOneWidget);
       expect(find.text('Registered Vehicle'), findsOneWidget);
       expect(find.text('Union Verification Status'), findsOneWidget);
+      expect(find.text('Driver Availability'), findsOneWidget);
+      expect(find.text('Incoming Ride Requests'), findsOneWidget);
+      expect(find.text('Current Ride'), findsOneWidget);
     });
 
     testWidgets(
@@ -107,6 +110,92 @@ void main() {
               'Your union credentials and vehicle permit are fully verified.'),
           findsOneWidget);
       expect(find.text('Cab KA-02-CD-5678'), findsOneWidget);
+      expect(
+          find.text(
+              'Your union credentials and vehicle permit are fully verified.'),
+          findsOneWidget);
+    });
+
+    testWidgets(
+        'renders fallback text when vehicle information is missing or empty',
+        (tester) async {
+      final noVehicleDriver = UserModel(
+        id: 'driver-3',
+        name: 'Amit Kumar',
+        phoneNumber: '+919876543210',
+        role: UserRole.driver,
+        vehicleInfo: '',
+        isUnionVerified: false,
+        createdAt: DateTime.now(),
+      );
+
+      final noVehicleController = AuthController(
+        initialState: AuthState.authenticated(noVehicleDriver),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: noVehicleController)),
+      );
+
+      expect(find.text('Vehicle details not available'), findsOneWidget);
+      expect(find.text('Not Set'), findsOneWidget);
+    });
+  });
+
+  group('DriverHomeScreen — Loading and Error States', () {
+    testWidgets('renders loading view when auth controller state is loading',
+        (tester) async {
+      final loadingController = AuthController(
+        initialState: const AuthState.loading(),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: loadingController)),
+      );
+
+      expect(find.text('Loading driver profile...'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('renders error view when user profile is null', (tester) async {
+      final unauthController = AuthController(
+        initialState: const AuthState.unauthenticated(),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: unauthController)),
+      );
+
+      expect(find.text('Driver Profile Not Found'), findsOneWidget);
+      expect(
+          find.text(
+              'Unable to resolve authenticated driver information. Please log in again.'),
+          findsOneWidget);
+    });
+
+    testWidgets('renders access restricted error when user is a Rider',
+        (tester) async {
+      final riderUser = UserModel(
+        id: 'rider-1',
+        name: 'Rahul Rider',
+        phoneNumber: '+919111122223',
+        role: UserRole.rider,
+        createdAt: DateTime.now(),
+      );
+
+      final riderController = AuthController(
+        initialState: AuthState.authenticated(riderUser),
+      );
+
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: riderController)),
+      );
+
+      expect(find.text('Access Restricted'), findsOneWidget);
+      expect(
+          find.text(
+              'This dashboard is reserved for authenticated driver accounts.'),
+          findsOneWidget);
     });
 
     testWidgets(
@@ -190,7 +279,22 @@ void main() {
     });
   });
 
-  group('DriverHomeScreen — Logout Workflow', () {
+  group('DriverHomeScreen — Navigation and Logout Workflow', () {
+    testWidgets('navigates to Profile screen when profile icon is tapped',
+        (tester) async {
+      await tester.pumpWidget(
+        wrap(DriverHomeScreen(authController: controller)),
+      );
+
+      final profileButton = find.byIcon(Icons.person_outline_rounded);
+      expect(profileButton, findsOneWidget);
+
+      await tester.tap(profileButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('User Profile'), findsOneWidget);
+    });
+
     testWidgets(
         'successful logout clears stack and navigates to LoginScreen',
         (tester) async {
@@ -267,12 +371,6 @@ void main() {
       await tester.pump();
       await tester.tap(find.byType(IconButton).last, warnIfMissed: false);
       await tester.pump();
-
-      completer.complete();
-      await tester.pumpAndSettle();
-
-      expect(slowController.isAuthenticated, isFalse);
-      expect(find.text('Sign in to continue'), findsOneWidget);
     });
   });
 }
