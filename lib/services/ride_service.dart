@@ -353,28 +353,34 @@ class RideService {
     }
   }
 
-  /// Observes the driver's current active (accepted) ride in real-time.
+  /// Observes the driver's current active ride in real-time.
   ///
-  /// Streams the single ride where:
+  /// An "active" ride is one where:
   ///   - `driverId == authenticatedDriverId`
-  ///   - `status == 'accepted'`
+  ///   - `status` is one of: `accepted`, `arrived`, `inProgress`
   ///
   /// Yields `null` when no active ride exists.
   ///
-  /// If multiple accepted rides are found for the same driver (a data-integrity
-  /// violation), this method emits a [FirestoreException] with code
-  /// `integrity-violation` rather than silently picking one.
-  ///
-  /// The [driverId] must be non-empty.
+  /// If multiple active rides are found for the same driver (data-integrity
+  /// violation), emits a [FirestoreException] with code `integrity-violation`.
   Stream<RideModel?> watchDriverActiveRide(String driverId) {
     if (driverId.trim().isEmpty) {
       return Stream.error(const FirestoreException('Invalid driver ID.'));
     }
 
+    // The active statuses for a driver's operational ride
+    const activeStatuses = {
+      'accepted',
+      'arrived',
+      'inProgress',
+    };
+
     try {
+      // Query by driverId only; filter active statuses client-side
+      // (Firestore 'whereIn' on status would work too, but this keeps
+      //  the query simple and avoids composite-index requirements)
       return _rides
           .where('driverId', isEqualTo: driverId.trim())
-          .where('status', isEqualTo: RideStatus.accepted.name)
           .snapshots()
           .map((snapshot) {
         final validDocs = <RideModel>[];
@@ -383,20 +389,23 @@ class RideService {
           final data = doc.data();
           if (data == null) continue;
           try {
+            final statusStr = data['status'] as String?;
+            if (statusStr == null || !activeStatuses.contains(statusStr)) {
+              continue;
+            }
             final ride = RideModel.fromMap(data, doc.id);
-            // Strict guard: data['status'] must literally equal 'accepted'
-            if (ride.status == RideStatus.accepted &&
-                data['status'] == RideStatus.accepted.name) {
+            // Strict double-check after deserialization
+            if (ride.status == RideStatus.accepted ||
+                ride.status == RideStatus.arrived ||
+                ride.status == RideStatus.inProgress) {
               validDocs.add(ride);
             }
           } catch (_) {
-            // Skip malformed documents
-            continue;
+            continue; // Skip malformed documents
           }
         }
 
         if (validDocs.length > 1) {
-          // Data-integrity violation: more than one accepted ride for the same driver
           throw const FirestoreException(
             'Multiple active rides found. Please contact support.',
             code: 'integrity-violation',
@@ -409,6 +418,103 @@ class RideService {
       });
     } catch (e) {
       return Stream.error(FirestoreException.from(e));
+    }
+  }
+
+  /// Atomically transitions ride status from [accepted] to [arrived].
+  ///
+  /// Validates ownership and current status before committing.
+  Future<void> markRideArrived(String rideId, String driverId) async {
+    await _transitionRideStatus(
+      rideId: rideId,
+      driverId: driverId,
+      expectedStatus: RideStatus.accepted,
+      nextStatus: RideStatus.arrived,
+    );
+  }
+
+  /// Atomically transitions ride status from [arrived] to [inProgress].
+  Future<void> startRide(String rideId, String driverId) async {
+    await _transitionRideStatus(
+      rideId: rideId,
+      driverId: driverId,
+      expectedStatus: RideStatus.arrived,
+      nextStatus: RideStatus.inProgress,
+    );
+  }
+
+  /// Atomically transitions ride status from [inProgress] to [completed].
+  Future<void> completeRide(String rideId, String driverId) async {
+    await _transitionRideStatus(
+      rideId: rideId,
+      driverId: driverId,
+      expectedStatus: RideStatus.inProgress,
+      nextStatus: RideStatus.completed,
+    );
+  }
+
+  /// Internal: Performs a validated, atomic status transition via Firestore transaction.
+  ///
+  /// Checks:
+  ///   1. Document exists.
+  ///   2. `driverId` matches the authenticated driver.
+  ///   3. Current status equals [expectedStatus].
+  ///   4. Writes [nextStatus] + `updatedAt` only.
+  Future<void> _transitionRideStatus({
+    required String rideId,
+    required String driverId,
+    required RideStatus expectedStatus,
+    required RideStatus nextStatus,
+  }) async {
+    if (rideId.trim().isEmpty) throw ArgumentError('Ride ID cannot be empty.');
+    if (driverId.trim().isEmpty) throw ArgumentError('Driver ID cannot be empty.');
+
+    try {
+      final docRef = _rides.doc(rideId.trim());
+
+      await _firestore.runTransaction((tx) async {
+        final snapshot = await tx.get(docRef);
+
+        if (!snapshot.exists) {
+          throw const FirestoreException('Ride not found.', code: 'not-found');
+        }
+
+        final data = snapshot.data();
+        if (data == null) {
+          throw const FirestoreException('Ride data is corrupted.', code: 'data-corrupted');
+        }
+
+        // Ownership
+        if (data['driverId'] != driverId) {
+          throw const FirestoreException(
+            'Unauthorized: you are not the assigned driver for this ride.',
+            code: 'permission-denied',
+          );
+        }
+
+        // Status pre-condition
+        final currentStr = data['status'] as String?;
+        if (currentStr != expectedStatus.name) {
+          if (currentStr == RideStatus.cancelled.name) {
+            throw const FirestoreException(
+              'This ride was cancelled by the rider.',
+              code: 'invalid-state',
+            );
+          }
+          throw FirestoreException(
+            'Cannot update ride: expected status "${expectedStatus.name}" but found "${currentStr ?? 'unknown'}".',
+            code: 'invalid-state',
+          );
+        }
+
+        tx.update(docRef, {
+          'status': nextStatus.name,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      if (e is FirestoreException) rethrow;
+      throw FirestoreException.from(e);
     }
   }
 

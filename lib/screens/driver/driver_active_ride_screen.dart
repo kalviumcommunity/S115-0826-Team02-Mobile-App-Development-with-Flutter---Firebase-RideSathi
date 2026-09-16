@@ -3,6 +3,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/active_ride_controller.dart';
 import '../../core/state/auth_controller.dart';
+import '../../core/state/ride_progress_controller.dart';
 import '../../models/ride_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
@@ -12,9 +13,16 @@ import '../../widgets/status_badge.dart';
 
 /// Driver-facing Active Ride screen for RideSathi.
 ///
-/// Displays the driver's current accepted ride with full ride details.
-/// Real-time updates handle rider cancellation and other status changes.
-/// This screen is read-only: no status transitions occur here (PR 37).
+/// Displays the driver's current operational ride with full details and
+/// status-appropriate action buttons:
+///
+///   accepted  → [ Arrived ]
+///   arrived   → [ Start Ride ]
+///   inProgress → [ Complete Ride ]
+///   completed → (navigates back to Driver Home)
+///
+/// Real-time updates via [ActiveRideController] ensure the UI reflects
+/// the authoritative Firestore state.
 class DriverActiveRideScreen extends StatefulWidget {
   /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
@@ -22,10 +30,14 @@ class DriverActiveRideScreen extends StatefulWidget {
   /// Optional [ActiveRideController] for dependency injection in tests.
   final ActiveRideController? activeRideController;
 
+  /// Optional [RideProgressController] for dependency injection in tests.
+  final RideProgressController? progressController;
+
   const DriverActiveRideScreen({
     super.key,
     this.authController,
     this.activeRideController,
+    this.progressController,
   });
 
   @override
@@ -34,8 +46,10 @@ class DriverActiveRideScreen extends StatefulWidget {
 
 class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
   late final AuthController _authController;
-  late final ActiveRideController _controller;
-  bool _ownsController = false;
+  late final ActiveRideController _activeRideController;
+  late final RideProgressController _progressController;
+  bool _ownsActiveRideController = false;
+  bool _ownsProgressController = false;
 
   @override
   void initState() {
@@ -43,26 +57,88 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
     _authController = widget.authController ?? AuthController.instance;
 
     if (widget.activeRideController != null) {
-      _controller = widget.activeRideController!;
-      _ownsController = false;
+      _activeRideController = widget.activeRideController!;
+      _ownsActiveRideController = false;
     } else {
-      _controller = ActiveRideController(authController: _authController);
-      _ownsController = true;
+      _activeRideController =
+          ActiveRideController(authController: _authController);
+      _ownsActiveRideController = true;
     }
 
-    _controller.startListening();
+    _activeRideController.startListening();
+
+    if (widget.progressController != null) {
+      _progressController = widget.progressController!;
+      _ownsProgressController = false;
+    } else {
+      _progressController = RideProgressController(
+        authController: _authController,
+        activeRideController: _activeRideController,
+      );
+      _ownsProgressController = true;
+    }
+
+    _progressController.addListener(_onProgressChanged);
+    _activeRideController.addListener(_onRideStateChanged);
+  }
+
+  void _onProgressChanged() {
+    final state = _progressController.state;
+    if (state.isError && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message ?? 'Action failed. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _progressController.clearError();
+    }
+  }
+
+  void _onRideStateChanged() {
+    // When ride completes or disappears, navigate back to Driver Home
+    final activeRide = _activeRideController.activeRide;
+    final isEmptyOrCompleted = _activeRideController.state.isEmpty ||
+        (activeRide != null &&
+            (activeRide.status == RideStatus.completed ||
+                activeRide.status == RideStatus.cancelled));
+
+    if (isEmptyOrCompleted && mounted) {
+      final message = activeRide?.status == RideStatus.cancelled
+          ? 'This ride was cancelled by the rider.'
+          : activeRide?.status == RideStatus.completed
+              ? 'Ride completed!'
+              : null;
+
+      if (message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: activeRide?.status == RideStatus.completed
+                ? Colors.green
+                : Colors.orange,
+          ),
+        );
+      }
+
+      // Small delay for snackbar to show before navigating
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) AppNavigator.toDriverHome(context);
+      });
+    }
   }
 
   @override
   void dispose() {
-    if (_ownsController) {
-      _controller.dispose();
-    }
+    _progressController.removeListener(_onProgressChanged);
+    _activeRideController.removeListener(_onRideStateChanged);
+    if (_ownsProgressController) _progressController.dispose();
+    if (_ownsActiveRideController) _activeRideController.dispose();
     super.dispose();
   }
 
   String _formatDateTime(DateTime dt) {
-    final months = [
+    const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
@@ -119,9 +195,9 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
         ),
       ),
       body: AnimatedBuilder(
-        animation: _controller,
+        animation: _activeRideController,
         builder: (context, _) {
-          final state = _controller.state;
+          final state = _activeRideController.state;
 
           if (state.isInitial || state.isLoading) {
             return const LoadingView(message: 'Loading active ride...');
@@ -130,7 +206,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
           if (state.isError) {
             return ErrorView(
               message: state.message ?? 'Failed to load active ride.',
-              onRetry: _controller.retry,
+              onRetry: _activeRideController.retry,
             );
           }
 
@@ -139,7 +215,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
               icon: Icons.directions_car_outlined,
               title: 'No Active Ride',
               description:
-                  'You do not have an active accepted ride at this moment.',
+                  'You do not have an active ride at this moment.',
               actionLabel: 'Back to Home',
               actionIcon: Icons.home_rounded,
               onAction: () => AppNavigator.toDriverHome(context),
@@ -147,13 +223,13 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
           }
 
           final ride = state.data!;
-          return _buildActiveRideContent(context, ride, theme, isDark);
+          return _buildRideContent(context, ride, theme, isDark);
         },
       ),
     );
   }
 
-  Widget _buildActiveRideContent(
+  Widget _buildRideContent(
     BuildContext context,
     RideModel ride,
     ThemeData theme,
@@ -168,64 +244,11 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Status Banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppConstants.spaceXL),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [const Color(0xFF064E3B), const Color(0xFF022C22)]
-                    : [const Color(0xFFD1FAE5), const Color(0xFFA7F3D0)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(AppConstants.radiusPill),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppConstants.spaceM),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.green,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(width: AppConstants.spaceL),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ride Accepted',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF065F46),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      StatusBadge(status: ride.status.name),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _StatusBanner(ride: ride, isDark: isDark),
 
           const SizedBox(height: AppConstants.spaceXL),
 
-          // Route Card
+          // Route
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppConstants.spaceL),
@@ -234,18 +257,12 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.route_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
+                      Icon(Icons.route_rounded,
+                          size: 18, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
-                      Text(
-                        'Route',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Route',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: AppConstants.spaceM),
@@ -266,7 +283,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
 
           const SizedBox(height: AppConstants.spaceM),
 
-          // Ride Details Card
+          // Details
           Card(
             child: Padding(
               padding: const EdgeInsets.all(AppConstants.spaceL),
@@ -275,32 +292,24 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
+                      Icon(Icons.info_outline_rounded,
+                          size: 18, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
-                      Text(
-                        'Ride Details',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Ride Details',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const SizedBox(height: AppConstants.spaceM),
                   const Divider(height: 1),
                   const SizedBox(height: AppConstants.spaceM),
-                  _detailRow(
-                    context,
+                  _DetailRow(
                     icon: Icons.electric_rickshaw_rounded,
                     label: 'Vehicle',
                     value: _vehicleLabel(ride.vehicleType),
                   ),
                   const SizedBox(height: AppConstants.spaceM),
-                  _detailRow(
-                    context,
+                  _DetailRow(
                     icon: Icons.currency_rupee_rounded,
                     label: 'Estimated Fare',
                     value: '₹${ride.estimatedFare.toStringAsFixed(0)}',
@@ -308,8 +317,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
                     bold: true,
                   ),
                   const SizedBox(height: AppConstants.spaceM),
-                  _detailRow(
-                    context,
+                  _DetailRow(
                     icon: Icons.access_time_rounded,
                     label: 'Requested At',
                     value: _formatDateTime(ride.createdAt),
@@ -321,20 +329,16 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
 
           const SizedBox(height: AppConstants.spaceXL),
 
-          // Navigate back to home
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => AppNavigator.toDriverHome(context),
-              icon: const Icon(Icons.home_rounded),
-              label: const Text('Back to Driver Home'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                ),
-              ),
-            ),
+          // Action buttons driven by current status
+          AnimatedBuilder(
+            animation: _progressController,
+            builder: (context, _) {
+              return _ActionArea(
+                ride: ride,
+                progressController: _progressController,
+                onBack: () => AppNavigator.toDriverHome(context),
+              );
+            },
           ),
 
           const SizedBox(height: AppConstants.spaceXL),
@@ -342,15 +346,289 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
       ),
     );
   }
+}
 
-  Widget _detailRow(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-    bool bold = false,
-  }) {
+// ---------------------------------------------------------------------------
+// Status Banner
+// ---------------------------------------------------------------------------
+
+class _StatusBanner extends StatelessWidget {
+  final RideModel ride;
+  final bool isDark;
+
+  const _StatusBanner({required this.ride, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Color bg1;
+    Color bg2;
+    Color iconColor;
+    IconData icon;
+    String label;
+
+    switch (ride.status) {
+      case RideStatus.accepted:
+        bg1 = isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5);
+        bg2 = isDark ? const Color(0xFF022C22) : const Color(0xFFA7F3D0);
+        iconColor = Colors.green;
+        icon = Icons.check_circle_rounded;
+        label = 'Ride Accepted';
+        break;
+      case RideStatus.arrived:
+        bg1 = isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDEEEFF);
+        bg2 = isDark ? const Color(0xFF0F2040) : const Color(0xFFBDD8FF);
+        iconColor = Colors.blue;
+        icon = Icons.location_on_rounded;
+        label = 'You Have Arrived';
+        break;
+      case RideStatus.inProgress:
+        bg1 = isDark ? const Color(0xFF3B2F05) : const Color(0xFFFFF8E1);
+        bg2 = isDark ? const Color(0xFF1F1803) : const Color(0xFFFFECB3);
+        iconColor = Colors.orange;
+        icon = Icons.navigation_rounded;
+        label = 'Ride In Progress';
+        break;
+      default:
+        bg1 = isDark
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surfaceContainerLow;
+        bg2 = bg1;
+        iconColor = theme.colorScheme.primary;
+        icon = Icons.info_outline_rounded;
+        label = ride.status.name;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.spaceXL),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [bg1, bg2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppConstants.radiusPill),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spaceM),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 32),
+          ),
+          const SizedBox(width: AppConstants.spaceL),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                StatusBadge(status: ride.status.name),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Action Area
+// ---------------------------------------------------------------------------
+
+class _ActionArea extends StatelessWidget {
+  final RideModel ride;
+  final RideProgressController progressController;
+  final VoidCallback onBack;
+
+  const _ActionArea({
+    required this.ride,
+    required this.progressController,
+    required this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = progressController.state.isLoading;
+
+    switch (ride.status) {
+      case RideStatus.accepted:
+        return _PrimaryActionButton(
+          label: 'Arrived at Pickup',
+          icon: Icons.location_on_rounded,
+          color: Colors.blue,
+          isLoading: isLoading,
+          loadingLabel: 'Updating...',
+          onPressed: () => progressController.markArrived(),
+        );
+
+      case RideStatus.arrived:
+        return _PrimaryActionButton(
+          label: 'Start Ride',
+          icon: Icons.navigation_rounded,
+          color: Colors.orange,
+          isLoading: isLoading,
+          loadingLabel: 'Starting ride...',
+          onPressed: () => progressController.startRide(),
+        );
+
+      case RideStatus.inProgress:
+        return _PrimaryActionButton(
+          label: 'Complete Ride',
+          icon: Icons.flag_rounded,
+          color: Colors.green,
+          isLoading: isLoading,
+          loadingLabel: 'Completing...',
+          onPressed: () => _confirmComplete(context),
+        );
+
+      default:
+        // Completed / cancelled / unexpected — show back button only
+        return SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onBack,
+            icon: const Icon(Icons.home_rounded),
+            label: const Text('Back to Driver Home'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppConstants.radiusM),
+              ),
+            ),
+          ),
+        );
+    }
+  }
+
+  Future<void> _confirmComplete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Complete Ride?'),
+        content: const Text(
+          'Are you sure you want to mark this ride as completed? '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text(
+              'Complete Ride',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await progressController.completeRide();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reusable Primary Action Button
+// ---------------------------------------------------------------------------
+
+class _PrimaryActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool isLoading;
+  final String loadingLabel;
+  final VoidCallback? onPressed;
+
+  const _PrimaryActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.isLoading,
+    required this.loadingLabel,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: isLoading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppConstants.radiusM),
+          ),
+        ),
+        icon: isLoading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Icon(icon),
+        label: Text(
+          isLoading ? loadingLabel : label,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Detail Row
+// ---------------------------------------------------------------------------
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool bold;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
