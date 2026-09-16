@@ -212,8 +212,6 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                 ),
                 trailing: StatusBadge(status: ride.status),
                 onTap: () {
-                  // We will implement DispatcherRideDetailScreen later and route to it.
-                  // For now, it's a placeholder.
                   _showActiveRideDetails(ride);
                 },
               ),
