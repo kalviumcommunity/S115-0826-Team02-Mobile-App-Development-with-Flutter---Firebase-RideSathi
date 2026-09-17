@@ -4,12 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
-import 'package:ridesathi/core/state/driver_availability_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/driver/driver_home_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
-import '../../services/driver_availability_service_test.dart';
+
 
 class _FakeAuthService extends AuthService {
   final bool shouldFailSignOut;
@@ -30,7 +29,6 @@ class _FakeAuthService extends AuthService {
 
 void main() {
   late AuthController controller;
-  late FakeDriverAvailabilityService fakeAvailabilityService;
 
   Widget wrap(Widget child) {
     return MaterialApp(
@@ -54,7 +52,7 @@ void main() {
   setUp(() {
     AuthController.resetInstance();
     FirebaseService.isInitializedOverride = true;
-    fakeAvailabilityService = FakeDriverAvailabilityService();
+
     controller = AuthController(
       authService: const _FakeAuthService(),
       initialState: AuthState.authenticated(dummyDriver),
@@ -153,7 +151,7 @@ void main() {
     testWidgets('renders loading view when auth controller state is loading',
         (tester) async {
       final loadingController = AuthController(
-        initialState: const AuthState.loading(),
+        initialState: const AuthState.authenticating(),
       );
 
       await tester.pumpWidget(
@@ -272,9 +270,9 @@ void main() {
       await tester.pumpAndSettle();
 
       // Sign in Driver B
-      authCtrl.restoreSession(driverB);
+      // Sign in Driver B (Simulated via widget parameter)
       await tester.pumpWidget(
-        wrap(DriverHomeScreen(authController: authCtrl)),
+        wrap(DriverHomeScreen(authController: authCtrl, user: driverB)),
       );
       await tester.pumpAndSettle();
 

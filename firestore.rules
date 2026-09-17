@@ -95,14 +95,17 @@ service cloud.firestore {
         // Dispatcher can modify arbitrarily for assignment
         isDispatcher() ||
         
-        // Rider can update (cancel)
-        (resource.data.riderId == request.auth.uid && affectedKeys().hasOnly(['status', 'updatedAt']) && request.resource.data.status == 'cancelled') ||
+        // Rider can update (cancel or provide feedback)
+        (resource.data.riderId == request.auth.uid && (
+          (affectedKeys().hasOnly(['status', 'updatedAt']) && request.resource.data.status == 'cancelled') ||
+          (affectedKeys().hasOnly(['feedback', 'updatedAt']) && request.resource.data.status == 'completed' && resource.data.status == 'completed')
+        )) ||
         
         // Driver can update (accept, arrive, location, etc.)
         (
           isDriver() &&
           (resource.data.driverId == null || resource.data.driverId == request.auth.uid) // allow assignment acceptance or assigned updates
-          && !affectedKeys().hasAny(['riderId', 'createdAt', 'estimatedFare'])
+          && !affectedKeys().hasAny(['riderId', 'createdAt', 'estimatedFare', 'feedback'])
         )
       ) && isServerTimestamp('updatedAt');
     }

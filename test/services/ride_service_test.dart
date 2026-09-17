@@ -167,10 +167,10 @@ void main() {
 
       final history = await service.getRiderRideHistory('rider_A');
       
-      expect(history.length, equals(2));
+      expect(history.rides.length, equals(2));
       // Should be newest first
-      expect(history[0].id, equals('ride_2'));
-      expect(history[1].id, equals('ride_1'));
+      expect(history.rides[0].id, equals('ride_2'));
+      expect(history.rides[1].id, equals('ride_1'));
     });
 
     test('respects the limit parameter', () async {
@@ -184,15 +184,15 @@ void main() {
 
       final history = await service.getRiderRideHistory('rider_A', limit: 2);
       
-      expect(history.length, equals(2));
+      expect(history.rides.length, equals(2));
       // Newest first
-      expect(history[0].id, equals('ride_4'));
-      expect(history[1].id, equals('ride_3'));
+      expect(history.rides[0].id, equals('ride_4'));
+      expect(history.rides[1].id, equals('ride_3'));
     });
 
     test('returns empty list if no rides found', () async {
       final history = await service.getRiderRideHistory('non_existent_rider');
-      expect(history, isEmpty);
+      expect(history.rides, isEmpty);
     });
 
     test('gracefully skips malformed records without failing the whole query', () async {
@@ -216,8 +216,8 @@ void main() {
       final history = await service.getRiderRideHistory('rider_A');
       
       // Should only return the valid ride
-      expect(history.length, equals(1));
-      expect(history[0].id, equals('valid_ride'));
+      expect(history.rides.length, equals(1));
+      expect(history.rides[0].id, equals('valid_ride'));
     });
 
     test('throws ArgumentError on empty rider ID', () {
@@ -240,11 +240,12 @@ void main() {
       String status = 'completed',
       Map<String, dynamic>? feedback,
     }) async {
-      await fakeFirestore.collection('rides').doc(id).set({
+      final Map<String, dynamic> data = {
         'riderId': riderId,
         'status': status,
-        if (feedback != null) 'feedback': feedback,
-      });
+      };
+      if (feedback != null) data['feedback'] = feedback;
+      await fakeFirestore.collection('rides').doc(id).set(data);
     }
 
     test('successfully submits feedback for a completed ride', () async {

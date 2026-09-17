@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/ride_feedback_controller.dart';
 import 'package:ridesathi/core/state/view_state.dart';
-import 'package:ridesathi/models/driver_location.dart';
-import 'package:ridesathi/models/location_model.dart';
-import 'package:ridesathi/models/ride_model.dart';
-import 'package:ridesathi/models/ride_request_draft.dart';
 import 'package:ridesathi/screens/rider/ride_feedback_screen.dart';
-import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/ride_service.dart';
 import 'package:ridesathi/widgets/star_rating_input.dart';
 
 class MockRideFeedbackController extends RideFeedbackController {

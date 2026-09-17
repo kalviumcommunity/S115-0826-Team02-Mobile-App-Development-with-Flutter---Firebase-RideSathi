@@ -118,7 +118,7 @@ class RideHistoryCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _formatDate(ride.createdAt),
+                    ride.createdAt != null ? _formatDate(ride.createdAt!) : 'Unknown Date',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

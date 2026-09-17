@@ -4,10 +4,8 @@ import 'package:ridesathi/core/state/fallback_matching_controller.dart';
 import 'package:ridesathi/models/candidate_evaluation.dart';
 import 'package:ridesathi/models/driver_operational_data.dart';
 import 'package:ridesathi/models/matching_attempt_state.dart';
-import 'package:ridesathi/models/ride_model.dart';
-import 'package:ridesathi/models/location_model.dart';
 import 'package:ridesathi/services/ride_service.dart';
-import 'dart:async';
+import 'package:ridesathi/core/state/view_state.dart';
 
 class _FakeFallbackController extends FallbackMatchingController {
   MatchingAttemptState _fakeState = const MatchingAttemptState();
@@ -16,7 +14,6 @@ class _FakeFallbackController extends FallbackMatchingController {
   @override
   ViewState<MatchingAttemptState> get state => ViewState.success(_fakeState);
 
-  @override
   String? get activeRideId => _fakeActiveRideId;
 
   void emitSuccess(MatchingAttemptState newState, String rideId) {

@@ -24,6 +24,7 @@ class RideAcceptanceController extends ChangeNotifier {
     required IncomingRideRequestsController requestsController,
   })  : _rideService = rideService ?? RideService(),
         _authController = authController ?? AuthController.instance,
+        // ignore: prefer_initializing_formals
         _requestsController = requestsController {
     _authController.addListener(_onAuthChanged);
   }

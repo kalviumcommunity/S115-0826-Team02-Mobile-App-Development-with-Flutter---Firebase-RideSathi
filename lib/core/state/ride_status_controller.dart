@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../models/ride_model.dart';
@@ -121,7 +123,7 @@ class RideStatusController extends ChangeNotifier {
       _executeTimeout(ride.id);
     } else {
       final now = _clock.now();
-      final deadline = ride.createdAt.add(AppConstants.rideRequestTimeout);
+      final deadline = ride.createdAt!.add(AppConstants.rideRequestTimeout);
       final remaining = deadline.difference(now);
       
       _timeoutTimer = Timer(remaining, () {

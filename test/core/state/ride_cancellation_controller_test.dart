@@ -2,12 +2,11 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/ride_cancellation_controller.dart';
-import 'package:ridesathi/models/driver_location.dart';
-import 'package:ridesathi/models/ride_model.dart';
+
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/ride_service.dart';
 
-class MockRideService implements RideService {
+class MockRideService extends Fake implements RideService {
   int cancelCallCount = 0;
   bool throwOnCancel = false;
 
@@ -16,16 +15,6 @@ class MockRideService implements RideService {
     if (throwOnCancel) throw Exception('Firebase error');
     cancelCallCount++;
   }
-
-  // Unimplemented methods
-  @override
-  Future<RideModel> createRideRequest(dynamic draft, String riderId) => throw UnimplementedError();
-
-  @override
-  Stream<RideModel?> watchRide(String rideId) => throw UnimplementedError();
-
-  @override
-  Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) => throw UnimplementedError();
 }
 
 class MockAuthController extends AuthController {
@@ -127,19 +116,10 @@ void main() {
   });
 }
 
-class _SlowMockRideService implements RideService {
+class _SlowMockRideService extends Fake implements RideService {
   final Future<void> Function() onCancel;
   _SlowMockRideService(this.onCancel);
 
   @override
   Future<void> cancelRide(String rideId, String riderId) => onCancel();
-
-  @override
-  Future<RideModel> createRideRequest(dynamic draft, String riderId) => throw UnimplementedError();
-
-  @override
-  Stream<RideModel?> watchRide(String rideId) => throw UnimplementedError();
-
-  @override
-  Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) => throw UnimplementedError();
 }

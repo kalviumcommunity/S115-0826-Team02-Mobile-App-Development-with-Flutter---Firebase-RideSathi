@@ -42,14 +42,14 @@ class OperationalAnalyticsService {
         
         // Status counts
         final status = data['status'] as String?;
-        if (status == RideStatus.completed.name) completed++;
-        else if (status == RideStatus.cancelled.name) cancelled++;
-        else if (status == RideStatus.timedOut.name) timedOut++;
-        else if (status == RideStatus.rejected.name) rejected++;
-        else if (status == RideStatus.requested.name) requested++;
-        else if (status == RideStatus.accepted.name) accepted++;
-        else if (status == RideStatus.arrived.name) arrived++;
-        else if (status == RideStatus.inProgress.name) inProgress++;
+        if (status == RideStatus.completed.name) { completed++; }
+        else if (status == RideStatus.cancelled.name) { cancelled++; }
+        else if (status == RideStatus.timedOut.name) { timedOut++; }
+        else if (status == RideStatus.rejected.name) { rejected++; }
+        else if (status == RideStatus.requested.name) { requested++; }
+        else if (status == RideStatus.accepted.name) { accepted++; }
+        else if (status == RideStatus.arrived.name) { arrived++; }
+        else if (status == RideStatus.inProgress.name) { inProgress++; }
 
         // Demand by Location (using pickup displayName)
         final pickup = data['pickup'] as Map<String, dynamic>?;

@@ -169,12 +169,18 @@ class _DispatcherAnalyticsScreenState extends State<DispatcherAnalyticsScreen> {
               padding: EdgeInsets.all(AppConstants.spaceXL),
               child: CircularProgressIndicator(),
             )),
-            error: (message, _) => ErrorView(
+            error: (message, code, err) => ErrorView(
               title: 'Failed to load analytics',
               message: message,
               onRetry: () => _controller.loadAnalytics(refresh: true),
             ),
-            success: (analytics) {
+            empty: (msg) => const EmptyStateView(
+              icon: Icons.bar_chart_rounded,
+              title: 'No analytics available',
+              description: 'Try changing the date range or checking back later.',
+            ),
+            success: (OperationalAnalytics? analytics) {
+              if (analytics == null) return const SizedBox.shrink();
               if (analytics.rideCounts.total == 0) {
                 return const EmptyStateView(
                   icon: Icons.bar_chart_rounded,

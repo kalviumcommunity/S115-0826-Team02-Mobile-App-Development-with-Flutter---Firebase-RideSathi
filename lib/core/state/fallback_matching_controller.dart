@@ -30,8 +30,8 @@ class FallbackMatchingController extends ChangeNotifier {
     NearestDriverService? nearestDriverService,
     FallbackMatchingService? fallbackService,
     AuthController? authController,
-  })  : _nearestDriverService = nearestDriverService ?? const NearestDriverService(),
-        _fallbackService = fallbackService ?? const FallbackMatchingService(),
+  })  : _nearestDriverService = nearestDriverService ?? NearestDriverService(),
+        _fallbackService = fallbackService ?? FallbackMatchingService(),
         _authController = authController ?? AuthController.instance {
     _authController.addListener(_onAuthChanged);
   }

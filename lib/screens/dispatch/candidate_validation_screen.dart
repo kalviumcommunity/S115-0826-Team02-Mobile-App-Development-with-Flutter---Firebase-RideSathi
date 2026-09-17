@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/state/automatic_assignment_controller.dart';
 import '../../core/state/fallback_matching_controller.dart';
-import '../../core/state/nearest_driver_controller.dart';
 import '../../models/candidate_evaluation.dart';
+import '../../models/fallback_reason.dart';
 import '../../models/ride_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
 import '../../services/ride_service.dart';
+import '../../models/matching_attempt_state.dart';
 
 /// A minimal dispatcher screen for validating Candidate Driver Discovery and
 /// Nearest Driver ranking (PR 40 + PR 41 validation surface).
@@ -67,7 +68,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
   }
 
   Future<void> _assignDriver(String driverId) async {
-    final service = const RideService();
+    final service = RideService();
     try {
       if (widget.isReassignment) {
         await service.reassignRide(widget.ride.id, widget.currentDriverId!, driverId);
@@ -111,11 +112,11 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
               loading: (msg) => LoadingView(message: msg),
               error: (msg, code, err) => ErrorView(
                 message: msg,
-                onRetry: () => _controller.startListening(widget.ride),
+                onRetry: () => _fallbackController.startListening(widget.ride),
               ),
               empty: (msg) => EmptyStateView(
                 icon: Icons.search_off_rounded,
-                message: msg,
+                title: msg ?? 'No candidates found',
               ),
               success: (attemptState) {
                 final evaluations = attemptState.rankedCandidates;
@@ -126,8 +127,8 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    _controller.stopListening();
-                    _controller.startListening(widget.ride);
+                    _fallbackController.stopListening();
+                    _fallbackController.startListening(widget.ride);
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(AppConstants.spaceL),
@@ -203,7 +204,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
       margin: const EdgeInsets.only(bottom: AppConstants.spaceL),
       padding: const EdgeInsets.all(AppConstants.spaceM),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
       ),
       child: const Row(
@@ -236,7 +237,7 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
 
     return Container(
       padding: const EdgeInsets.all(AppConstants.spaceL),
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: Row(
         children: [
           const Icon(Icons.info_outline, size: 24),
@@ -297,8 +298,8 @@ class _CandidateValidationScreenState extends State<CandidateValidationScreen> {
 
     return Card(
       color: isEligible
-          ? (isCurrentCandidate ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.25) : null)
-          : Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+          ? (isCurrentCandidate ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.25) : null)
+          : Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.3),
       margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.spaceM),

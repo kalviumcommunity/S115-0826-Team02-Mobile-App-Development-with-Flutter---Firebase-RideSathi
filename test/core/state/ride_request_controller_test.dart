@@ -2,13 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/ride_request_controller.dart';
 
-import 'package:ridesathi/models/driver_location.dart';
 import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/models/ride_request_draft.dart';
 import 'package:ridesathi/services/ride_service.dart';
 
 // Very basic Mocking since we don't have mockito configured here yet
-class MockRideService implements RideService {
+class MockRideService extends Fake implements RideService {
   bool shouldThrow = false;
   RideModel? returnedRide;
 
@@ -23,24 +22,6 @@ class MockRideService implements RideService {
       createdAt: DateTime.now(), updatedAt: DateTime.now()
     );
   }
-
-  @override
-  Future<void> cancelRide(String rideId, String riderId) async {}
-
-  @override
-  Future<RideModel?> getRide(String rideId) async => null;
-
-  @override
-  Stream<RideModel> streamRideStatus(String rideId) => const Stream.empty();
-
-  @override
-  Stream<RideModel?> watchRide(String rideId) => const Stream.empty();
-
-  @override
-  Future<void> updateDriverLocation(String rideId, DriverLocation location, String driverId) async {}
-
-  @override
-  Future<void> submitRideFeedback(String rideId, String riderId, int rating, {String? comment}) async {}
 }
 
 void main() {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/state/auth_controller.dart';
+
 import '../../core/state/driver_ride_history_controller.dart';
 import '../../models/ride_model.dart';
 import '../../widgets/empty_state_view.dart';
@@ -106,22 +106,19 @@ class _DriverRideHistoryScreenState extends State<DriverRideHistoryScreen> {
         child: state.when(
           initial: () => const SizedBox.shrink(),
           loading: (_) => const Center(child: CircularProgressIndicator()),
-          error: (message, _) => ErrorView(
+          error: (message, code, err) => ErrorView(
             title: 'Failed to load history',
             message: message,
             onRetry: () => _controller.loadHistory(refresh: true),
           ),
+          empty: (msg) => EmptyStateView(
+            icon: Icons.history_rounded,
+            title: 'No rides found',
+            description: _controller.currentStatusFilter == null 
+              ? 'You haven\'t taken any rides yet.'
+              : 'No rides match the selected filter.',
+          ),
           success: (history) {
-            if (history.isEmpty) {
-              return EmptyStateView(
-                icon: Icons.history_rounded,
-                title: 'No rides found',
-                description: _controller.currentStatusFilter == null 
-                  ? 'You haven\'t completed any rides yet.'
-                  : 'No rides match the selected filter.',
-              );
-            }
-
             return RefreshIndicator(
               onRefresh: () => _controller.loadHistory(refresh: true),
               child: ListView.builder(

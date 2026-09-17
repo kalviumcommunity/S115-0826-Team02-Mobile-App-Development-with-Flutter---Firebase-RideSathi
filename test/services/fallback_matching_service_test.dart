@@ -17,9 +17,9 @@ void main() {
       return DriverOperationalData(
         id: id,
         name: 'Driver $id',
-        vehicleType: 'autoRickshaw',
+        phoneNumber: '1234567890',
         isOnline: true,
-        isVerified: true,
+        isUnionVerified: true,
       );
     }
 

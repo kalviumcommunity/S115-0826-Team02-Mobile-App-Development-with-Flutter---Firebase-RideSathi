@@ -17,7 +17,7 @@ class MockRiderRideHistoryController extends RiderRideHistoryController {
   ViewState<List<RideModel>> get state => mockState;
 
   @override
-  Future<void> loadHistory({int limit = 20}) async {
+  Future<void> loadHistory({bool refresh = false, RideStatus? status}) async {
     loadHistoryCallCount++;
   }
 }
@@ -67,8 +67,9 @@ void main() {
         RideModel(
           id: 'ride_1',
           riderId: 'rider_1',
-          pickup: const LocationModel(latitude: 0, longitude: 0, address: 'A'),
-          destination: const LocationModel(latitude: 0, longitude: 0, address: 'B'),
+          vehicleType: VehicleType.autoRickshaw,
+          pickup: const LocationModel(id: 'p1', latitude: 0, longitude: 0, address: 'A', displayName: 'A'),
+          destination: const LocationModel(id: 'd1', latitude: 0, longitude: 0, address: 'B', displayName: 'B'),
           status: RideStatus.completed,
           estimatedFare: 100,
           createdAt: DateTime.now(),

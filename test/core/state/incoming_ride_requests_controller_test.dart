@@ -3,8 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/core/state/incoming_ride_requests_controller.dart';
-import 'package:ridesathi/core/state/view_state.dart';
-import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/ride_service.dart';
 
