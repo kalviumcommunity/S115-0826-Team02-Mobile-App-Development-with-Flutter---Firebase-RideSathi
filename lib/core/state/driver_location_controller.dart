@@ -22,7 +22,8 @@ class DriverLocationController extends ChangeNotifier {
   StreamSubscription<DriverLocation>? _locationSubscription;
   StreamSubscription<RideModel?>? _rideSubscription;
   bool _isDisposed = false;
-  int? _activeSessionGeneration;
+
+
 
   DriverLocationController({
     required this.rideId,
@@ -116,7 +117,7 @@ class DriverLocationController extends ChangeNotifier {
 
       final driverId = currentUser.id;
       final sessionGen = _authController.sessionGeneration;
-      _activeSessionGeneration = sessionGen;
+
 
       _state = const ViewState.success(null);
       notifyListeners();
@@ -172,7 +173,7 @@ class DriverLocationController extends ChangeNotifier {
   void stopPublishing() {
     _locationSubscription?.cancel();
     _locationSubscription = null;
-    _activeSessionGeneration = null;
+
 
     if (!_isDisposed && !_state.isInitial) {
       _state = const ViewState.initial();

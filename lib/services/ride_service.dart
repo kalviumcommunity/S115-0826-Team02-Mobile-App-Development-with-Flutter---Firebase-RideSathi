@@ -153,7 +153,6 @@ class RideService {
       if (currentStatusStr == RideStatus.completed.name || currentStatusStr == RideStatus.cancelled.name) {
         throw const FirestoreException('Cannot cancel a ride that is already completed or cancelled.', code: 'invalid-state');
       }
-
       await docRef.update({
         'status': RideStatus.cancelled.name,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -163,171 +162,6 @@ class RideService {
       throw FirestoreException.from(e);
     }
   }
-class RideHistoryPage {
-  final List<RideModel> rides;
-  final DocumentSnapshot? lastDocument;
-
-  const RideHistoryPage({required this.rides, this.lastDocument});
-}
-
-extension RideServiceHistory on RideService {
-  /// Retrieves the history of rides for the specified rider.
-  /// 
-  /// The [riderId] must match the currently authenticated user's ID to enforce ownership.
-  /// Results are ordered by `createdAt` descending, with a default [limit] of 20.
-  /// This query requires a Firestore composite index on `riderId` (ASC) and `createdAt` (DESC).
-  /// Throws a [FirestoreException] on failure.
-  Future<RideHistoryPage> getRiderRideHistory(
-    String riderId, {
-    int limit = 20,
-    DocumentSnapshot? startAfter,
-    RideStatus? status,
-  }) async {
-    if (riderId.trim().isEmpty) {
-      throw ArgumentError('Rider ID cannot be empty.');
-    }
-
-    try {
-      Query query = _rides.where('riderId', isEqualTo: riderId);
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.name);
-      }
-      
-      query = query.orderBy('createdAt', descending: true).limit(limit);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-
-      final querySnapshot = await query.get();
-      final List<RideModel> history = [];
-      DocumentSnapshot? lastDoc;
-
-      for (final doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data == null) continue;
-
-        try {
-          history.add(RideModel.fromMap(data, doc.id));
-          lastDoc = doc;
-        } catch (e) {
-          // Gracefully skip malformed records so they don't break the entire history view
-          continue;
-        }
-      }
-
-      return RideHistoryPage(rides: history, lastDocument: lastDoc);
-    } catch (e) {
-      throw FirestoreException.from(e);
-    }
-  }
-
-  /// Retrieves the history of rides for the specified driver.
-  Future<RideHistoryPage> getDriverRideHistory(
-    String driverId, {
-    int limit = 20,
-    DocumentSnapshot? startAfter,
-    RideStatus? status,
-  }) async {
-    if (driverId.trim().isEmpty) {
-      throw ArgumentError('Driver ID cannot be empty.');
-    }
-
-    try {
-      Query query = _rides.where('driverId', isEqualTo: driverId);
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.name);
-      }
-      
-      query = query.orderBy('createdAt', descending: true).limit(limit);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-
-      final querySnapshot = await query.get();
-      final List<RideModel> history = [];
-      DocumentSnapshot? lastDoc;
-
-      for (final doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data == null) continue;
-
-        try {
-          history.add(RideModel.fromMap(data, doc.id));
-          lastDoc = doc;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      return RideHistoryPage(rides: history, lastDocument: lastDoc);
-    } catch (e) {
-      throw FirestoreException.from(e);
-    }
-  }
-
-  /// Retrieves the operational history of rides for dispatchers.
-  Future<RideHistoryPage> getDispatcherRideHistory({
-    int limit = 20,
-    DocumentSnapshot? startAfter,
-    RideStatus? status,
-    String? driverId,
-    String? riderId,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    try {
-      Query query = _rides;
-      
-      if (status != null) {
-        query = query.where('status', isEqualTo: status.name);
-      }
-      if (driverId != null && driverId.isNotEmpty) {
-        query = query.where('driverId', isEqualTo: driverId);
-      }
-      if (riderId != null && riderId.isNotEmpty) {
-        query = query.where('riderId', isEqualTo: riderId);
-      }
-
-      query = query.orderBy('createdAt', descending: true);
-      
-      if (startDate != null) {
-        query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
-      }
-      if (endDate != null) {
-        query = query.where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
-      }
-
-      query = query.limit(limit);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-
-      final querySnapshot = await query.get();
-      final List<RideModel> history = [];
-      DocumentSnapshot? lastDoc;
-
-      for (final doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data == null) continue;
-
-        try {
-          history.add(RideModel.fromMap(data, doc.id));
-          lastDoc = doc;
-        } catch (e) {
-          continue;
-        }
-      }
-
-      return RideHistoryPage(rides: history, lastDocument: lastDoc);
-    } catch (e) {
-      throw FirestoreException.from(e);
-    }
-  }
-}
-
 
   /// Atomically assigns a driver to a requested ride.
   /// 
@@ -605,7 +439,7 @@ extension RideServiceHistory on RideService {
         final List<RideModel> requests = [];
         for (final doc in snapshot.docs) {
           final data = doc.data();
-          if (data == null) continue;
+
           try {
             final ride = RideModel.fromMap(data, doc.id);
             // Strict check on status to prevent malformed status fallback from making an invalid document actionable
@@ -616,6 +450,35 @@ extension RideServiceHistory on RideService {
             // Gracefully skip malformed document
             continue;
           }
+        }
+        return requests;
+      }).handleError((error) {
+        throw FirestoreException.from(error);
+      });
+    } catch (e) {
+      return Stream.error(FirestoreException.from(e));
+    }
+  }
+
+  /// Observes all requested rides across the system in real-time.
+  /// 
+  /// Streams rides where `status == 'requested'`.
+  /// Malformed documents are safely skipped.
+  Stream<List<RideModel>> watchAllRequestedRides() {
+    try {
+      return _rides
+          .where('status', isEqualTo: RideStatus.requested.name)
+          .snapshots()
+          .map((snapshot) {
+        final List<RideModel> requests = [];
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          try {
+            final ride = RideModel.fromMap(data, doc.id);
+            if (ride.status == RideStatus.requested && data['status'] == RideStatus.requested.name) {
+              requests.add(ride);
+            }
+          } catch (_) {}
         }
         return requests;
       }).handleError((error) {
@@ -660,7 +523,7 @@ extension RideServiceHistory on RideService {
 
         for (final doc in snapshot.docs) {
           final data = doc.data();
-          if (data == null) continue;
+
           try {
             final statusStr = data['status'] as String?;
             if (statusStr == null || !activeStatuses.contains(statusStr)) {
@@ -846,3 +709,171 @@ extension RideServiceHistory on RideService {
     }
   }
 }
+
+
+
+class RideHistoryPage {
+  final List<RideModel> rides;
+  final DocumentSnapshot? lastDocument;
+
+  const RideHistoryPage({required this.rides, this.lastDocument});
+}
+
+extension RideServiceHistory on RideService {
+  /// Retrieves the history of rides for the specified rider.
+  /// 
+  /// The [riderId] must match the currently authenticated user's ID to enforce ownership.
+  /// Results are ordered by `createdAt` descending, with a default [limit] of 20.
+  /// This query requires a Firestore composite index on `riderId` (ASC) and `createdAt` (DESC).
+  /// Throws a [FirestoreException] on failure.
+  Future<RideHistoryPage> getRiderRideHistory(
+    String riderId, {
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+    RideStatus? status,
+  }) async {
+    if (riderId.trim().isEmpty) {
+      throw ArgumentError('Rider ID cannot be empty.');
+    }
+
+    try {
+      Query query = _rides.where('riderId', isEqualTo: riderId);
+      if (status != null) {
+        query = query.where('status', isEqualTo: status.name);
+      }
+      
+      query = query.orderBy('createdAt', descending: true).limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final querySnapshot = await query.get();
+      final List<RideModel> history = [];
+      DocumentSnapshot? lastDoc;
+
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+
+        try {
+          history.add(RideModel.fromMap(data, doc.id));
+          lastDoc = doc;
+        } catch (e) {
+          // Gracefully skip malformed records so they don't break the entire history view
+          continue;
+        }
+      }
+
+      return RideHistoryPage(rides: history, lastDocument: lastDoc);
+    } catch (e) {
+      throw FirestoreException.from(e);
+    }
+  }
+
+  /// Retrieves the history of rides for the specified driver.
+  Future<RideHistoryPage> getDriverRideHistory(
+    String driverId, {
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+    RideStatus? status,
+  }) async {
+    if (driverId.trim().isEmpty) {
+      throw ArgumentError('Driver ID cannot be empty.');
+    }
+
+    try {
+      Query query = _rides.where('driverId', isEqualTo: driverId);
+      if (status != null) {
+        query = query.where('status', isEqualTo: status.name);
+      }
+      
+      query = query.orderBy('createdAt', descending: true).limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final querySnapshot = await query.get();
+      final List<RideModel> history = [];
+      DocumentSnapshot? lastDoc;
+
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+
+        try {
+          history.add(RideModel.fromMap(data, doc.id));
+          lastDoc = doc;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      return RideHistoryPage(rides: history, lastDocument: lastDoc);
+    } catch (e) {
+      throw FirestoreException.from(e);
+    }
+  }
+
+  /// Retrieves the operational history of rides for dispatchers.
+  Future<RideHistoryPage> getDispatcherRideHistory({
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+    RideStatus? status,
+    String? driverId,
+    String? riderId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      Query query = _rides;
+      
+      if (status != null) {
+        query = query.where('status', isEqualTo: status.name);
+      }
+      if (driverId != null && driverId.isNotEmpty) {
+        query = query.where('driverId', isEqualTo: driverId);
+      }
+      if (riderId != null && riderId.isNotEmpty) {
+        query = query.where('riderId', isEqualTo: riderId);
+      }
+
+      query = query.orderBy('createdAt', descending: true);
+      
+      if (startDate != null) {
+        query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+      }
+      if (endDate != null) {
+        query = query.where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+      }
+
+      query = query.limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final querySnapshot = await query.get();
+      final List<RideModel> history = [];
+      DocumentSnapshot? lastDoc;
+
+      for (final doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data == null) continue;
+
+        try {
+          history.add(RideModel.fromMap(data, doc.id));
+          lastDoc = doc;
+        } catch (e) {
+          continue;
+        }
+      }
+
+      return RideHistoryPage(rides: history, lastDocument: lastDoc);
+    } catch (e) {
+      throw FirestoreException.from(e);
+    }
+  }
+}
+

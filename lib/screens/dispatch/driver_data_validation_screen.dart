@@ -56,13 +56,14 @@ class _DriverDataValidationScreenState
       body: state.when(
         initial: () => const LoadingView(message: 'Initializing stream...'),
         loading: (msg) => LoadingView(message: msg),
-        error: (msg, err) => ErrorView(
-          message: msg,
+        error: (message, code, err) => ErrorView(
+          title: 'Error',
+          message: message,
           onRetry: _controller.startListening,
         ),
         empty: (msg) => EmptyStateView(
           icon: Icons.group_off_rounded,
-          message: msg,
+          title: msg ?? 'No drivers found',
         ),
         success: (drivers) {
           return RefreshIndicator(
@@ -73,7 +74,7 @@ class _DriverDataValidationScreenState
             child: ListView.separated(
               padding: const EdgeInsets.all(AppConstants.spaceL),
               itemCount: drivers.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (context, _) =>
                   const SizedBox(height: AppConstants.spaceM),
               itemBuilder: (context, index) {
                 final driver = drivers[index];
@@ -143,7 +144,7 @@ class _DriverDataValidationScreenState
                             ),
                             if (driver.hasLocation && driver.location!.updatedAt != null) ...[
                               Text(
-                                'Pos: ${_formatDateTime(driver.location!.updatedAt)}',
+                                'Pos: ${_formatDateTime(driver.location!.updatedAt!)}',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],

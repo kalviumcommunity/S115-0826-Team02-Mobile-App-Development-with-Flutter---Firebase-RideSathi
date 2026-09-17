@@ -24,7 +24,7 @@ class DriverDataController extends ChangeNotifier {
   DriverDataController({
     DriverDataService? driverDataService,
     AuthController? authController,
-  })  : _driverDataService = driverDataService ?? const DriverDataService(),
+  })  : _driverDataService = driverDataService ?? DriverDataService(),
         _authController = authController ?? AuthController.instance {
     _init();
   }

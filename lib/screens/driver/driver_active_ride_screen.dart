@@ -365,7 +365,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen> {
                   _DetailRow(
                     icon: Icons.access_time_rounded,
                     label: 'Requested At',
-                    value: _formatDateTime(ride.createdAt),
+                    value: ride.createdAt != null ? _formatDateTime(ride.createdAt!) : 'Unknown',
                   ),
                 ],
               ),

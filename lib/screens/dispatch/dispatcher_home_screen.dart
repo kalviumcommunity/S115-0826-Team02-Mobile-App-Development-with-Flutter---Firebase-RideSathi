@@ -67,7 +67,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
   void _logout() async {
     await widget.authController.signOut();
     if (mounted) {
-      AppNavigator.toLogin(context);
+      AppNavigator.logout(context);
     }
   }
 
@@ -140,7 +140,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
       ),
       empty: (msg) => EmptyStateView(
         icon: Icons.search_off_rounded,
-        message: msg,
+        title: msg ?? 'No rides found',
       ),
       success: (rides) {
         return ListView.builder(
@@ -161,7 +161,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                     Text('Created: ${ride.createdAt?.toLocal().toString().split('.').first ?? "Unknown"}'),
                   ],
                 ),
-                trailing: StatusBadge(status: ride.status),
+                trailing: StatusBadge(status: ride.status.name),
                 onTap: () {
                   AppNavigator.pushNamed(
                     context, 
@@ -190,7 +190,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
       ),
       empty: (msg) => EmptyStateView(
         icon: Icons.check_circle_outline_rounded,
-        message: msg,
+        title: msg ?? 'No rides found',
       ),
       success: (rides) {
         return ListView.builder(
@@ -210,7 +210,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                     Text('Updated: ${ride.updatedAt?.toLocal().toString().split('.').first ?? "Unknown"}'),
                   ],
                 ),
-                trailing: StatusBadge(status: ride.status),
+                trailing: StatusBadge(status: ride.status.name),
                 onTap: () {
                   _showActiveRideDetails(ride);
                 },
@@ -322,7 +322,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
             ),
             empty: (msg) => EmptyStateView(
               icon: Icons.group_off_rounded,
-              message: msg,
+              title: msg ?? 'No drivers found',
             ),
             success: (drivers) {
               return ListView.builder(
@@ -334,7 +334,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                     margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: driver.isOnline ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                        backgroundColor: driver.isOnline ? Colors.green.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.2),
                         child: Icon(
                           driver.isOnline ? Icons.person : Icons.person_off,
                           color: driver.isOnline ? Colors.green : Colors.grey,
@@ -390,7 +390,8 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                 const Divider(),
                 if (driver.location != null) ...[
                   Text('Location: ${driver.location!.latitude.toStringAsFixed(4)}, ${driver.location!.longitude.toStringAsFixed(4)}'),
-                  Text('Location Timestamp: ${driver.location!.timestamp.toLocal().toString().split('.').first}'),
+                  if (driver.location!.updatedAt != null)
+                    Text('Location Timestamp: ${driver.location!.updatedAt!.toLocal().toString().split('.').first}'),
                 ] else ...[
                   const Text('Location: Not available'),
                 ],

@@ -33,8 +33,8 @@ void main() {
       return RideModel(
         id: 'ride123',
         riderId: 'rider123',
-        pickup: const LocationModel(latitude: 0, longitude: 0, address: ''),
-        destination: const LocationModel(latitude: 0, longitude: 0, address: ''),
+        pickup: const LocationModel(id: 'p1', latitude: 0, longitude: 0, address: '', displayName: ''),
+        destination: const LocationModel(id: 'd1', latitude: 0, longitude: 0, address: '', displayName: ''),
         vehicleType: VehicleType.autoRickshaw,
         status: status,
         estimatedFare: 100,

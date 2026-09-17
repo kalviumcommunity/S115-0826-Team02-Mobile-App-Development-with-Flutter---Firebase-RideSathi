@@ -1,4 +1,4 @@
-import 'package:rxdart/rxdart.dart';
+
 import '../models/candidate_evaluation.dart';
 import '../models/driver_operational_data.dart';
 import '../models/ride_model.dart';
@@ -11,9 +11,9 @@ import 'driver_data_service.dart';
 class CandidateDriverService {
   final DriverDataService _driverDataService;
 
-  const CandidateDriverService({
+  CandidateDriverService({
     DriverDataService? driverDataService,
-  }) : _driverDataService = driverDataService ?? const DriverDataService();
+  }) : _driverDataService = driverDataService ?? DriverDataService();
 
   /// Streams a list of [CandidateEvaluation] for the given [ride].
   ///

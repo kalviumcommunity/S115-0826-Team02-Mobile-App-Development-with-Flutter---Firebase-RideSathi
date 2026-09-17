@@ -109,16 +109,20 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
         statusDescription = 'Enjoy the ride to your destination.';
         break;
       case RideStatus.completed:
-        statusMessage = 'You have reached your destination.';
-        statusDescription = 'Thank you for riding with RideSathi.';
+        statusMessage = 'Ride completed.';
+        statusDescription = 'Thank you for riding with us!';
         break;
       case RideStatus.cancelled:
-        statusMessage = 'This ride was cancelled.';
-        statusDescription = 'You can request a new ride from the home screen.';
+        statusMessage = 'Ride cancelled.';
+        statusDescription = 'This ride was cancelled.';
         break;
       case RideStatus.timedOut:
-        statusMessage = 'Ride Request Timed Out';
-        statusDescription = 'No driver accepted this request within the allowed time. You can request another ride.';
+        statusMessage = 'Ride request timed out.';
+        statusDescription = 'No drivers were available to accept your request.';
+        break;
+      case RideStatus.rejected:
+        statusMessage = 'Ride request rejected.';
+        statusDescription = 'Your request was rejected.';
         break;
     }
 
@@ -197,8 +201,7 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
             listenable: _cancellationController,
             builder: (context, _) {
               final isLoading = _cancellationController.state.isLoading;
-              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled || ride.status == RideStatus.timedOut;
-              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled;
+              final isTerminal = ride.status == RideStatus.completed || ride.status == RideStatus.cancelled || ride.status == RideStatus.timedOut || ride.status == RideStatus.rejected;
               final actionTheme = Theme.of(context);
 
               return Column(

@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/ride_model.dart';
+import '../../models/user_model.dart';
 import '../../services/ride_service.dart';
-import '../../services/firestore_exception.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
@@ -20,7 +19,7 @@ class DispatcherRequestedRidesController extends ChangeNotifier {
   DispatcherRequestedRidesController({
     RideService? rideService,
     AuthController? authController,
-  })  : _rideService = rideService ?? const RideService(),
+  })  : _rideService = rideService ?? RideService(),
         _authController = authController ?? AuthController.instance {
     _init();
   }
@@ -48,7 +47,7 @@ class DispatcherRequestedRidesController extends ChangeNotifier {
 
   void _startListening() {
     _stopListening();
-    _setState(const ViewState.loading('Loading requested rides...'));
+    _setState(const ViewState.loading(message: 'Loading requested rides...'));
 
     final currentSession = _sessionGeneration;
 
@@ -59,25 +58,25 @@ class DispatcherRequestedRidesController extends ChangeNotifier {
           
           // Sort descending by created/updated time
           rides.sort((a, b) {
-            final timeA = a.updatedAt ?? a.createdAt;
-            final timeB = b.updatedAt ?? b.createdAt;
+            final timeA = a.updatedAt ?? a.createdAt ?? DateTime.now();
+            final timeB = b.updatedAt ?? b.createdAt ?? DateTime.now();
             return timeB.compareTo(timeA);
           });
           
           if (rides.isEmpty) {
-            _setState(const ViewState.empty('No requested rides found.'));
+            _setState(const ViewState.empty(message: 'No requested rides found.'));
           } else {
             _setState(ViewState.success(rides));
           }
         },
         onError: (error) {
           if (_isDisposed || _sessionGeneration != currentSession) return;
-          _setState(ViewState.error('Failed to load requested rides', null, error));
+          _setState(ViewState.error('Failed to load requested rides', error: error));
         },
       );
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentSession) return;
-      _setState(ViewState.error('Failed to initialize requested rides stream', null, e));
+      _setState(ViewState.error('Failed to initialize requested rides stream', error: e));
     }
   }
 

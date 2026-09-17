@@ -26,7 +26,7 @@ class MockLocationProvider implements LocationProvider {
   Stream<DriverLocation> getPositionStream() => streamController.stream;
 }
 
-class MockRideService implements RideService {
+class MockRideService extends Fake implements RideService {
   final StreamController<RideModel?> streamController =
       StreamController<RideModel?>.broadcast();
   int updateCallCount = 0;
@@ -51,10 +51,6 @@ class MockRideService implements RideService {
   Future<void> cancelRide(String rideId, String riderId) =>
       throw UnimplementedError();
 
-  @override
-  Future<List<RideModel>> getRiderRideHistory(String riderId,
-          {int limit = 20}) =>
-      throw UnimplementedError();
 }
 
 class MockAuthController extends AuthController {

@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/active_ride_controller.dart';
@@ -10,7 +8,7 @@ import '../../core/state/ride_acceptance_controller.dart';
 import '../../core/state/ride_rejection_controller.dart';
 import '../../core/state/driver_availability_controller.dart';
 import '../../core/theme/theme_controller.dart';
-import '../../models/ride_model.dart';
+
 import '../../models/user_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
@@ -82,6 +80,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         authController: _authController,
       );
       _ownsRequestsController = true;
+    }
     if (widget.acceptanceController != null) {
       _acceptanceController = widget.acceptanceController!;
       _ownsAcceptanceController = false;
@@ -716,7 +715,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 if (!_requestsController.isOnline) {
                   return const EmptyStateView(
                     title: 'Driver is Offline',
-                    message: 'Switch your availability to Online above to receive incoming ride requests.',
+                    description: 'Switch your availability to Online above to receive incoming ride requests.',
                     icon: Icons.wifi_off_rounded,
                   );
                 }
@@ -739,7 +738,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 if (state.isEmpty || state.data == null || state.data!.isEmpty) {
                   return const EmptyStateView(
                     title: 'No incoming ride requests',
-                    message: 'You are online. Eligible ride requests assigned to you will appear here automatically.',
+                    description: 'You are online. Eligible ride requests assigned to you will appear here automatically.',
                     icon: Icons.inbox_rounded,
                   );
                 }
@@ -756,7 +755,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ? ride.destination.address
                           : 'Destination address pending',
                       status: ride.status.name,
-                      dateTime: _formatDateTime(ride.createdAt),
+                      dateTime: ride.createdAt != null ? _formatDateTime(ride.createdAt!) : 'Unknown',
                       fare: '₹${ride.estimatedFare.toStringAsFixed(0)}',
                       vehicleInfo: 'Vehicle: ${ride.vehicleType.name}',
                       onTap: () {

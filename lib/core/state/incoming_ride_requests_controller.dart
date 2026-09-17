@@ -72,7 +72,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
     final user = _authController.currentUser;
     if (user != null) {
       try {
-        await _availabilityService.setDriverOnlineStatus(user.id, online);
+        await _availabilityService.setAvailability(driverId: user.id, isOnline: online);
       } catch (e) {
         // If Firestore fails, we log and don't change local state, or change it back.
         // For now, we proceed to change local state. In a robust app, we'd handle this cleanly.
@@ -143,7 +143,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
               uniqueMap[req.id] = req;
             }
             final sortedList = uniqueMap.values.toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              ..sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
 
             _state = ViewState.success(sortedList);
           }

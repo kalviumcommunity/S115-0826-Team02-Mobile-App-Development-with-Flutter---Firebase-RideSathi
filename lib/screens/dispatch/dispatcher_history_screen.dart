@@ -66,7 +66,7 @@ class _DispatcherHistoryScreenState extends State<DispatcherHistoryScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<RideStatus?>(
-                    value: tempStatus,
+                    initialValue: tempStatus,
                     decoration: const InputDecoration(labelText: 'Status'),
                     items: [
                       const DropdownMenuItem(value: null, child: Text('All')),
@@ -139,10 +139,15 @@ class _DispatcherHistoryScreenState extends State<DispatcherHistoryScreen> {
           child: state.when(
             initial: () => const SizedBox.shrink(),
             loading: (_) => const Center(child: CircularProgressIndicator()),
-            error: (message, _) => ErrorView(
+            error: (message, code, err) => ErrorView(
               title: 'Failed to load history',
               message: message,
               onRetry: () => _controller.loadHistory(refresh: true),
+            ),
+            empty: (_) => const EmptyStateView(
+              icon: Icons.history_rounded,
+              title: 'No rides found',
+              description: 'No rides match your filters.',
             ),
             success: (history) {
               if (history.isEmpty) {
@@ -154,7 +159,6 @@ class _DispatcherHistoryScreenState extends State<DispatcherHistoryScreen> {
                       : 'No rides found matching your filters.',
                 );
               }
-
               return RefreshIndicator(
                 onRefresh: () => _controller.loadHistory(refresh: true),
                 child: ListView.builder(

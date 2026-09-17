@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/ride_model.dart';
-import '../../services/firestore_exception.dart';
+import '../../models/user_model.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
@@ -47,7 +47,7 @@ class DispatcherActiveRidesController extends ChangeNotifier {
 
   void _startListening() {
     _stopListening();
-    _setState(const ViewState.loading('Loading active rides...'));
+    _setState(const ViewState.loading(message: 'Loading active rides...'));
 
     final currentSession = _sessionGeneration;
 
@@ -78,8 +78,8 @@ class DispatcherActiveRidesController extends ChangeNotifier {
 
         // Sort descending by updated/created time
         rides.sort((a, b) {
-          final timeA = a.updatedAt ?? a.createdAt;
-          final timeB = b.updatedAt ?? b.createdAt;
+          final timeA = a.updatedAt ?? a.createdAt ?? DateTime.now();
+          final timeB = b.updatedAt ?? b.createdAt ?? DateTime.now();
           return timeB.compareTo(timeA);
         });
 
@@ -90,19 +90,19 @@ class DispatcherActiveRidesController extends ChangeNotifier {
         (rides) {
           if (_isDisposed || _sessionGeneration != currentSession) return;
           if (rides.isEmpty) {
-            _setState(const ViewState.empty('No active rides found.'));
+            _setState(const ViewState.empty(message: 'No active rides found.'));
           } else {
             _setState(ViewState.success(rides));
           }
         },
         onError: (error) {
           if (_isDisposed || _sessionGeneration != currentSession) return;
-          _setState(ViewState.error('Failed to load active rides', null, error));
+          _setState(ViewState.error('Failed to load active rides', error: error));
         },
       );
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentSession) return;
-      _setState(ViewState.error('Failed to initialize active rides stream', null, e));
+      _setState(ViewState.error('Failed to initialize active rides stream', error: e));
     }
   }
 

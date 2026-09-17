@@ -1,4 +1,4 @@
-import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
@@ -134,7 +134,7 @@ void main() {
         availabilityService: fakeService,
       );
 
-      final completer = Completer<bool>();
+
       // Simulate slow network write
       fakeService.setRawAvailability('driver-123', false);
 
@@ -164,7 +164,7 @@ void main() {
 
       // Sign out A, sign in B
       await authController.signOut();
-      authController.restoreSession(driverB);
+      authController.updateState(AuthState.authenticated(driverB));
 
       final ctrlB = DriverAvailabilityController(
         authController: authController,

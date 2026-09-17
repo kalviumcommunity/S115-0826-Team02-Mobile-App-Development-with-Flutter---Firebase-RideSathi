@@ -15,13 +15,13 @@ void main() {
     rideService = RideService(firestore: fakeFirestore);
   });
 
-  Future<void> _createRide(String id, String status) async {
+  Future<void> createRide(String id, String status) async {
     await fakeFirestore.collection('rides').doc(id).set({
       'id': id,
       'riderId': 'rider1',
       'status': status,
-      'pickup': const LocationModel(displayName: 'A', latitude: 0, longitude: 0).toMap(),
-      'destination': const LocationModel(displayName: 'B', latitude: 1, longitude: 1).toMap(),
+      'pickup': const LocationModel(id: 'p1', displayName: 'A', address: 'A', latitude: 0, longitude: 0).toMap(),
+      'destination': const LocationModel(id: 'd1', displayName: 'B', address: 'B', latitude: 1, longitude: 1).toMap(),
       'vehicleType': VehicleType.autoRickshaw.name,
       'estimatedFare': 50.0,
       'createdAt': FieldValue.serverTimestamp(),
@@ -29,7 +29,7 @@ void main() {
     });
   }
 
-  Future<void> _createDriver(String id, bool isOnline) async {
+  Future<void> createDriver(String id, bool isOnline) async {
     await fakeFirestore.collection('users').doc(id).set({
       'id': id,
       'name': 'Driver $id',
@@ -39,8 +39,8 @@ void main() {
   }
 
   test('assignRide succeeds when ride is requested and driver is online', () async {
-    await _createRide('ride1', 'requested');
-    await _createDriver('driver1', true);
+    await createRide('ride1', RideStatus.requested.name);
+    await createDriver('driver1', true);
 
     await rideService.assignRide('ride1', 'driver1');
 
@@ -50,8 +50,8 @@ void main() {
   });
 
   test('assignRide fails when driver is offline', () async {
-    await _createRide('ride1', 'requested');
-    await _createDriver('driver1', false);
+    await createRide('ride1', RideStatus.requested.name);
+    await createDriver('driver1', false);
 
     expect(
       () => rideService.assignRide('ride1', 'driver1'),
@@ -60,8 +60,8 @@ void main() {
   });
 
   test('assignRide fails when ride is cancelled', () async {
-    await _createRide('ride1', 'cancelled');
-    await _createDriver('driver1', true);
+    await createRide('ride1', 'cancelled');
+    await createDriver('driver1', true);
 
     expect(
       () => rideService.assignRide('ride1', 'driver1'),
@@ -70,8 +70,8 @@ void main() {
   });
 
   test('assignRide fails when ride is timedOut', () async {
-    await _createRide('ride1', 'timedOut');
-    await _createDriver('driver1', true);
+    await createRide('ride1', 'timedOut');
+    await createDriver('driver1', true);
 
     expect(
       () => rideService.assignRide('ride1', 'driver1'),
@@ -80,7 +80,7 @@ void main() {
   });
 
   test('assignRide fails when driver profile is missing', () async {
-    await _createRide('ride1', 'requested');
+    await createRide('ride1', 'requested');
 
     expect(
       () => rideService.assignRide('ride1', 'driver1'),

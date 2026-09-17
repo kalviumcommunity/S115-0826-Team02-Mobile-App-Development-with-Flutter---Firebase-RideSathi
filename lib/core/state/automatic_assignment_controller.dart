@@ -21,7 +21,7 @@ class AutomaticAssignmentController extends ChangeNotifier {
   AutomaticAssignmentController({
     required this.fallbackController,
     RideService? rideService,
-  }) : rideService = rideService ?? const RideService() {
+  }) : rideService = rideService ?? RideService() {
     fallbackController.addListener(_onFallbackStateChanged);
   }
 
@@ -29,19 +29,17 @@ class AutomaticAssignmentController extends ChangeNotifier {
     if (_isDisposed || _isAssigning) return;
 
     final state = fallbackController.state;
-    state.whenOrNull(
+    state.maybeWhen(
       success: (attemptState) {
         if (attemptState.status == MatchingAttemptStatus.candidateSelected ||
             attemptState.status == MatchingAttemptStatus.fallbackTransition) {
           final candidate = attemptState.currentCandidate;
-          // Note: fallbackController.activeRideId doesn't exist, we must track it ourselves
-          // or add it to FallbackMatchingController. We'll use the rideId from the candidate evaluation's context if possible, 
-          // or just assume we know the active ride because we pass it to `reset`.
           if (candidate != null && _activeRideId != null) {
             _attemptAssignment(candidate.driver.id);
           }
         }
       },
+      orElse: () {},
     );
   }
 

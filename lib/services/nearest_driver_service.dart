@@ -12,9 +12,9 @@ import 'service_exception.dart';
 class NearestDriverService {
   final CandidateDriverService _candidateDriverService;
 
-  const NearestDriverService({
+  NearestDriverService({
     CandidateDriverService? candidateDriverService,
-  }) : _candidateDriverService = candidateDriverService ?? const CandidateDriverService();
+  }) : _candidateDriverService = candidateDriverService ?? CandidateDriverService();
 
   /// Streams ranked [CandidateEvaluation] results for the given [ride].
   ///

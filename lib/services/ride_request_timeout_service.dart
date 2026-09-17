@@ -26,7 +26,7 @@ class RideRequestTimeoutService {
     }
 
     final now = clock.now();
-    final elapsed = now.difference(ride.createdAt);
+    final elapsed = now.difference(ride.createdAt ?? now);
 
     return elapsed >= timeout;
   }

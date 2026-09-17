@@ -27,7 +27,7 @@ class NearestDriverController extends ChangeNotifier {
   NearestDriverController({
     NearestDriverService? nearestDriverService,
     AuthController? authController,
-  })  : _nearestDriverService = nearestDriverService ?? const NearestDriverService(),
+  })  : _nearestDriverService = nearestDriverService ?? NearestDriverService(),
         _authController = authController ?? AuthController.instance {
     _init();
   }

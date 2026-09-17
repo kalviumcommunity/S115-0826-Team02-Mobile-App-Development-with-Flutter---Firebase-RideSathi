@@ -25,7 +25,7 @@ class CandidateDriverController extends ChangeNotifier {
   CandidateDriverController({
     CandidateDriverService? candidateService,
     AuthController? authController,
-  })  : _candidateService = candidateService ?? const CandidateDriverService(),
+  })  : _candidateService = candidateService ?? CandidateDriverService(),
         _authController = authController ?? AuthController.instance {
     _init();
   }

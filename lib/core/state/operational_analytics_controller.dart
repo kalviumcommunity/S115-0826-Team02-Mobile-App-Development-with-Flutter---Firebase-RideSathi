@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../models/operational_analytics.dart';
+import '../../models/operational_analytics.dart';
 import '../../services/operational_analytics_service.dart';
 import '../../services/firestore_exception.dart';
 import 'auth_controller.dart';

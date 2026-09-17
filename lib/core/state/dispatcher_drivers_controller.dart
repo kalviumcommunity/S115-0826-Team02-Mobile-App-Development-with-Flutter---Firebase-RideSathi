@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../models/driver_operational_data.dart';
 import '../../models/user_model.dart';
 import '../../services/driver_data_service.dart';
-import '../../services/firestore_exception.dart';
 import 'auth_controller.dart';
 import 'view_state.dart';
 
@@ -44,7 +43,7 @@ class DispatcherDriversController extends ChangeNotifier {
   DispatcherDriversController({
     DriverDataService? driverDataService,
     AuthController? authController,
-  })  : _driverDataService = driverDataService ?? const DriverDataService(),
+  })  : _driverDataService = driverDataService ?? DriverDataService(),
         _authController = authController ?? AuthController.instance {
     _init();
   }
@@ -88,7 +87,7 @@ class DispatcherDriversController extends ChangeNotifier {
 
   void _startListening() {
     _stopListening();
-    _setState(const ViewState.loading('Loading drivers...'));
+    _setState(const ViewState.loading(message: 'Loading drivers...'));
 
     final currentSession = _sessionGeneration;
 
@@ -103,12 +102,12 @@ class DispatcherDriversController extends ChangeNotifier {
         },
         onError: (error) {
           if (_isDisposed || _sessionGeneration != currentSession) return;
-          _setState(ViewState.error('Failed to load drivers', null, error));
+          _setState(ViewState.error('Failed to load drivers', error: error));
         },
       );
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentSession) return;
-      _setState(ViewState.error('Failed to initialize drivers stream', null, e));
+      _setState(ViewState.error('Failed to initialize drivers stream', error: e));
     }
   }
 
@@ -138,8 +137,7 @@ class DispatcherDriversController extends ChangeNotifier {
         filtered = filtered.where((d) => !d.isUnionVerified).toList();
         break;
       case DriverFilter.all:
-      default:
-        break;
+
     }
 
     // Apply Search
@@ -155,9 +153,9 @@ class DispatcherDriversController extends ChangeNotifier {
 
     if (filtered.isEmpty) {
       if (_allDrivers.isEmpty) {
-        _setState(const ViewState.empty('No drivers found in the system.'));
+        _setState(const ViewState.empty(message: 'No drivers found.'));
       } else {
-        _setState(const ViewState.empty('No drivers match your filters/search.'));
+        _setState(const ViewState.empty(message: 'No drivers match your filters.'));
       }
     } else {
       _setState(ViewState.success(filtered));

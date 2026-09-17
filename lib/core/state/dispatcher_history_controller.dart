@@ -134,8 +134,8 @@ class DispatcherHistoryController extends ChangeNotifier {
     } else {
       final q = _searchQuery.trim().toLowerCase();
       _filteredRides = _rides.where((ride) {
-        final pickupMatch = ride.pickup.displayName?.toLowerCase().contains(q) ?? false;
-        final destMatch = ride.destination.displayName?.toLowerCase().contains(q) ?? false;
+        final pickupMatch = ride.pickup.displayName.toLowerCase().contains(q);
+        final destMatch = ride.destination.displayName.toLowerCase().contains(q);
         final idMatch = ride.id.toLowerCase().contains(q);
         return pickupMatch || destMatch || idMatch;
       }).toList();
