@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.ridesathi.ridesathi"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

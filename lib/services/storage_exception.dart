@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class StorageException implements Exception {
@@ -28,6 +29,10 @@ class StorageException implements Exception {
     
     if (exception is StorageException) {
       return exception;
+    }
+
+    if (exception is TimeoutException || exception.toString().contains('TimeoutException')) {
+      return const StorageException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
     }
 
     return StorageException(exception.toString());

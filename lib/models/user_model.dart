@@ -21,6 +21,17 @@ enum UserRole {
   static bool isValid(String? value) => tryParse(value) != null;
 }
 
+/// Verification status for drivers set by admin.
+enum VerificationStatus {
+  pending,
+  verified,
+  rejected;
+
+  static VerificationStatus fromString(String? v) =>
+      VerificationStatus.values.firstWhere((e) => e.name == v,
+          orElse: () => VerificationStatus.pending);
+}
+
 /// Baseline User data model for RideSathi.
 class UserModel {
   final String id;
@@ -36,6 +47,10 @@ class UserModel {
   final DateTime? availabilityUpdatedAt;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  // Admin-managed fields
+  final bool isSuspended;
+  final String? suspendedReason;
+  final VerificationStatus verificationStatus;
 
   const UserModel({
     required this.id,
@@ -51,7 +66,11 @@ class UserModel {
     this.availabilityUpdatedAt,
     this.createdAt,
     this.updatedAt,
+    this.isSuspended = false,
+    this.suspendedReason,
+    this.verificationStatus = VerificationStatus.pending,
   });
+
 
   Map<String, dynamic> toMap() {
     return {
@@ -65,6 +84,9 @@ class UserModel {
       'vehicleInfo': vehicleInfo,
       'profileImageUrl': profileImageUrl,
       'driverDocumentUrl': driverDocumentUrl,
+      'isSuspended': isSuspended,
+      if (suspendedReason != null) 'suspendedReason': suspendedReason,
+      'verificationStatus': verificationStatus.name,
       if (availabilityUpdatedAt != null) 'availabilityUpdatedAt': availabilityUpdatedAt!.toIso8601String(),
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
@@ -100,6 +122,9 @@ class UserModel {
       vehicleInfo: map['vehicleInfo'] as String?,
       profileImageUrl: map['profileImageUrl'] as String?,
       driverDocumentUrl: map['driverDocumentUrl'] as String?,
+      isSuspended: map['isSuspended'] as bool? ?? false,
+      suspendedReason: map['suspendedReason'] as String?,
+      verificationStatus: VerificationStatus.fromString(map['verificationStatus'] as String?),
       availabilityUpdatedAt: availVal is Timestamp ? availVal.toDate() : (availVal is String ? DateTime.tryParse(availVal) : null),
       createdAt: createVal is Timestamp ? createVal.toDate() : (createVal is String ? DateTime.tryParse(createVal) : null),
       updatedAt: updateVal is Timestamp ? updateVal.toDate() : (updateVal is String ? DateTime.tryParse(updateVal) : null),
@@ -120,6 +145,9 @@ class UserModel {
     DateTime? availabilityUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isSuspended,
+    String? suspendedReason,
+    VerificationStatus? verificationStatus,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -135,6 +163,9 @@ class UserModel {
       availabilityUpdatedAt: availabilityUpdatedAt ?? this.availabilityUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isSuspended: isSuspended ?? this.isSuspended,
+      suspendedReason: suspendedReason ?? this.suspendedReason,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
     );
   }
 }

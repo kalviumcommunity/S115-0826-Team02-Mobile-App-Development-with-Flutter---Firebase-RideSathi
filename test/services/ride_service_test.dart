@@ -1,5 +1,10 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/models/driver_location.dart';
 import 'package:ridesathi/services/ride_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
@@ -11,6 +16,11 @@ void main() {
     late DriverLocation validLocation;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       fakeFirestore = FakeFirebaseFirestore();
       service = RideService(firestore: fakeFirestore);
       validLocation = DriverLocation(latitude: 10, longitude: 20, updatedAt: DateTime.now());
@@ -65,6 +75,11 @@ void main() {
     late RideService service;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       fakeFirestore = FakeFirebaseFirestore();
       service = RideService(firestore: fakeFirestore);
     });
@@ -142,6 +157,11 @@ void main() {
     late RideService service;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       fakeFirestore = FakeFirebaseFirestore();
       service = RideService(firestore: fakeFirestore);
     });
@@ -231,6 +251,11 @@ void main() {
     late RideService service;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       fakeFirestore = FakeFirebaseFirestore();
       service = RideService(firestore: fakeFirestore);
     });

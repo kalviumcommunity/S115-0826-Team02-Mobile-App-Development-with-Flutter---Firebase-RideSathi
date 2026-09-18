@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'firestore_exception.dart';
@@ -10,6 +11,8 @@ import 'firestore_exception.dart';
 /// Uses the authenticated Firebase UID as the Firestore document ID
 /// under the `users` collection.
 class UserProfileService {
+  static FirebaseFirestore? firestoreOverride;
+
   final FirebaseFirestore? _firestore;
 
   /// Creates a [UserProfileService]. If [firestore] is omitted,
@@ -18,7 +21,7 @@ class UserProfileService {
       : _firestore = firestore;
 
   FirebaseFirestore get _instance =>
-      _firestore ?? FirebaseFirestore.instance;
+      _firestore ?? firestoreOverride ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _instance.collection('users');
@@ -36,8 +39,11 @@ class UserProfileService {
       data['createdAt'] = FieldValue.serverTimestamp();
       data['updatedAt'] = FieldValue.serverTimestamp();
 
-      await _usersCollection.doc(user.id).set(data);
+      await _usersCollection.doc(user.id).set(data).timeout(const Duration(seconds: 15));
     } catch (e) {
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const FirestoreException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw FirestoreException.from(e);
     }
   }
@@ -55,8 +61,11 @@ class UserProfileService {
       data['createdAt'] = FieldValue.serverTimestamp();
       data['updatedAt'] = FieldValue.serverTimestamp();
 
-      await _usersCollection.doc(user.id).set(data);
+      await _usersCollection.doc(user.id).set(data).timeout(const Duration(seconds: 15));
     } catch (e) {
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const FirestoreException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw FirestoreException.from(e);
     }
   }
@@ -67,7 +76,7 @@ class UserProfileService {
   /// Throws [FirestoreException] on read failure or if the document contains an invalid/corrupted role.
   Future<UserModel?> getUserProfile(String uid) async {
     try {
-      final doc = await _usersCollection.doc(uid).get();
+      final doc = await _usersCollection.doc(uid).get().timeout(const Duration(seconds: 15));
       if (!doc.exists || doc.data() == null) return null;
 
       final data = Map<String, dynamic>.from(doc.data()!);
@@ -90,6 +99,9 @@ class UserProfileService {
       );
     } catch (e) {
       if (e is FirestoreException) rethrow;
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const FirestoreException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw FirestoreException.from(e);
     }
   }

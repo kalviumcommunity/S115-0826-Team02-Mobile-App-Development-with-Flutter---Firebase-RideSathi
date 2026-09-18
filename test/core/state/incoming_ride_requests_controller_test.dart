@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/core/state/incoming_ride_requests_controller.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/ride_service.dart';
 
@@ -10,13 +11,20 @@ void main() {
   group('IncomingRideRequestsController', () {
     late FakeFirebaseFirestore fakeFirestore;
     late RideService rideService;
+    late DriverAvailabilityService availabilityService;
     late AuthController authController;
     late UserModel driverUser;
     late UserModel riderUser;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       fakeFirestore = FakeFirebaseFirestore();
       rideService = RideService(firestore: fakeFirestore);
+      availabilityService = DriverAvailabilityService(fakeFirestore);
       authController = AuthController(initialState: const AuthState.unauthenticated());
 
       driverUser = const UserModel(
@@ -42,6 +50,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       expect(controller.isOnline, isFalse);
@@ -54,6 +63,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       // Unauthenticated
@@ -84,6 +94,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       controller.setOnline(true);
@@ -111,6 +122,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       controller.setOnline(true);
@@ -132,6 +144,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       controller.setOnline(true);
@@ -155,6 +168,7 @@ void main() {
       final controller = IncomingRideRequestsController(
         rideService: rideService,
         authController: authController,
+        availabilityService: availabilityService,
       );
 
       controller.setOnline(true);

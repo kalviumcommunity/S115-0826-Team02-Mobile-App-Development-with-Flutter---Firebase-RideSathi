@@ -1,4 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/models/candidate_evaluation.dart';
 import 'package:ridesathi/models/driver_operational_data.dart';
 import 'package:ridesathi/models/fallback_reason.dart';
@@ -10,6 +15,11 @@ void main() {
     late FallbackMatchingService service;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       service = const FallbackMatchingService();
     });
 
