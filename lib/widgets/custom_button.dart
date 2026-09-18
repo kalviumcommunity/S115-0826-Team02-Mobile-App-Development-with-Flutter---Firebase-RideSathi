@@ -68,10 +68,17 @@ class CustomButton extends StatelessWidget {
       child: isSecondary
           ? OutlinedButton(
               onPressed: isLoading ? null : onPressed,
+              style: OutlinedButton.styleFrom(
+                disabledForegroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
               child: buttonChild,
             )
           : ElevatedButton(
               onPressed: isLoading ? null : onPressed,
+              style: ElevatedButton.styleFrom(
+                disabledBackgroundColor: theme.colorScheme.primary.withValues(alpha: 0.6),
+                disabledForegroundColor: theme.colorScheme.onPrimary,
+              ),
               child: buttonChild,
             ),
     );

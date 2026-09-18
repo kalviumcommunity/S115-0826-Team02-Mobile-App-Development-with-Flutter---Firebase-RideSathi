@@ -23,6 +23,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
 
   ViewState<List<RideModel>> _state = const ViewState.initial();
   StreamSubscription<List<RideModel>>? _subscription;
+  final Set<String> _locallyRejectedRideIds = {};
   bool _isOnline = false;
   bool _isDisposed = false;
   int _activeSessionGeneration = 0;
@@ -123,7 +124,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _subscription = _rideService.watchIncomingRideRequests(driverId).listen(
+      _subscription = _rideService.watchAllRequestedRides().listen(
         (requests) {
           if (_isDisposed) return;
 
@@ -140,7 +141,9 @@ class IncomingRideRequestsController extends ChangeNotifier {
             // Unique collection by ride ID to prevent duplicate render
             final uniqueMap = <String, RideModel>{};
             for (final req in requests) {
-              uniqueMap[req.id] = req;
+              if (!_locallyRejectedRideIds.contains(req.id)) {
+                uniqueMap[req.id] = req;
+              }
             }
             final sortedList = uniqueMap.values.toList()
               ..sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
@@ -179,6 +182,16 @@ class IncomingRideRequestsController extends ChangeNotifier {
 
     if (!_isDisposed && !_state.isInitial) {
       _state = const ViewState.initial();
+      notifyListeners();
+    }
+  }
+
+  /// Mark a ride as locally rejected.
+  void locallyReject(String rideId) {
+    _locallyRejectedRideIds.add(rideId);
+    if (_state.isSuccess && _state.data != null) {
+      final filtered = _state.data!.where((r) => r.id != rideId).toList();
+      _state = ViewState.success(filtered);
       notifyListeners();
     }
   }

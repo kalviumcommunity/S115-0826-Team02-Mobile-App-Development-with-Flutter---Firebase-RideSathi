@@ -1,4 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/rider_ride_history_controller.dart';
 import 'package:ridesathi/core/state/view_state.dart';
@@ -58,6 +63,10 @@ void main() {
 
     setUp(() {
       fakeFirestore = FakeFirebaseFirestore();
+      RideService.firestoreOverride = fakeFirestore;
+      DriverAvailabilityService.firestoreOverride = fakeFirestore;
+      DriverDataService.firestoreOverride = fakeFirestore;
+      UserProfileService.firestoreOverride = fakeFirestore;
       realRideService = RideService(firestore: fakeFirestore);
       mockAuthController = MockAuthController()..mockUser = mockUser;
 

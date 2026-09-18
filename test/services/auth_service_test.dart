@@ -1,6 +1,11 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/service_exception.dart';
@@ -211,6 +216,11 @@ void main() {
     late TestAuthService authService;
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       authService = TestAuthService();
     });
 

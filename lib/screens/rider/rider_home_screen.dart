@@ -1,45 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
-import 'package:ridesathi/core/theme/theme_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/widgets/custom_button.dart';
-import 'package:ridesathi/widgets/empty_state_view.dart';
-import 'package:ridesathi/widgets/section_header.dart';
+import 'package:ridesathi/services/real_location_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
-/// Landing and dashboard screen for authenticated Riders in RideSathi.
-///
-/// PR 19 establishes the rider home shell with:
-/// - Rider greeting using the authenticated domain profile
-/// - Primary "Request a Ride" call-to-action
-/// - Current ride / activity section with empty state
-/// - Profile access from the app bar and bottom navigation
-/// - Bottom navigation with Home and Profile destinations
-///
-/// This screen does NOT create rides, write to Firestore, or access ride
-/// data directly. Those responsibilities belong to later PRs.
 class RiderHomeScreen extends StatefulWidget {
-  /// Optional [AuthController] for dependency injection in tests.
   final AuthController? authController;
-
-  /// Optional [UserModel] for explicit user identity passing.
   final UserModel? user;
-
   const RiderHomeScreen({super.key, this.authController, this.user});
-
   @override
   State<RiderHomeScreen> createState() => _RiderHomeScreenState();
 }
 
 class _RiderHomeScreenState extends State<RiderHomeScreen> {
   late final AuthController _authController;
+  final RealLocationService _locationService = RealLocationService();
+  final MapController _mapController = MapController();
   bool _isLoggingOut = false;
+  LatLng? _currentLocation;
 
   @override
   void initState() {
     super.initState();
     _authController = widget.authController ?? AuthController.instance;
+    _initializeLocation();
+  }
+
+  Future<void> _initializeLocation() async {
+    try {
+      final loc = await _locationService.getCurrentLocation();
+      if (mounted) {
+        setState(() => _currentLocation = LatLng(loc.latitude ?? 28.6139, loc.longitude ?? 77.2090));
+        _mapController.move(_currentLocation!, 15.0);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _currentLocation = const LatLng(28.6139, 77.2090));
+    }
   }
 
   UserModel? get _currentUser => widget.user ?? _authController.currentUser;
@@ -47,183 +45,196 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   Future<void> _handleLogout() async {
     if (_isLoggingOut) return;
     setState(() => _isLoggingOut = true);
-
     final success = await _authController.signOut();
-
     if (!mounted) return;
     setState(() => _isLoggingOut = false);
-
-    if (success) {
-      AppNavigator.logout(context);
-    } else {
-      final errorMessage = _authController.errorMessage ??
-          'Unable to sign out. Please try again.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          behavior: SnackBarBehavior.floating,
-          action: SnackBarAction(
-            label: 'Retry',
-            onPressed: _handleLogout,
-          ),
-        ),
-      );
-      _authController.clearError();
-    }
-  }
-
-  void _handleRequestRide() {
-    AppNavigator.toRiderRequestRide(context);
-  }
-
-  void _handleProfile() {
-    AppNavigator.toProfile(context);
-  }
-
-  void _handleHistory() {
-    AppNavigator.toRiderHistory(context);
+    if (success) { AppNavigator.logout(context); return; }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_authController.errorMessage ?? 'Sign out failed'), behavior: SnackBarBehavior.floating));
+    _authController.clearError();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = _currentUser;
-    final riderName = user?.name.isNotEmpty == true ? user!.name : 'Rider';
+    final firstName = (user?.name.isNotEmpty == true ? user!.name.split(' ').first : 'Rider');
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // ── Full-screen map ───────────────────────────────────────
+          Positioned.fill(
+            child: _currentLocation == null
+                ? Container(color: isDark ? const Color(0xFF0D1117) : const Color(0xFFE8EDF5))
+                : FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(initialCenter: _currentLocation!, initialZoom: 15.0),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.ridesathi.ridesathi',
+                      ),
+                      if (_currentLocation != null)
+                        MarkerLayer(markers: [
+                          Marker(
+                            point: _currentLocation!,
+                            width: 48, height: 48,
+                            child: Stack(alignment: Alignment.center, children: [
+                              Container(width: 48, height: 48, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.18), shape: BoxShape.circle)),
+                              Container(width: 16, height: 16, decoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2.5), boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.5), blurRadius: 8)])),
+                            ]),
+                          ),
+                        ]),
+                    ],
+                  ),
+          ),
+
+          // ── Top bar (floating) ────────────────────────────────────
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(children: [
+                // Menu / avatar
+                GestureDetector(
+                  onTap: () => AppNavigator.toProfile(context),
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10)],
+                    ),
+                    child: const Icon(Icons.person_outline_rounded, size: 22),
+                  ),
+                ),
+                const Spacer(),
+                // Brand pill
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10)],
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.local_taxi_rounded, size: 16, color: Color(0xFFF59E0B)),
+                    SizedBox(width: 6),
+                    Text('RideSathi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ]),
+                ),
+                const Spacer(),
+                // Logout
+                GestureDetector(
+                  onTap: _isLoggingOut ? null : _handleLogout,
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 10)],
+                    ),
+                    child: _isLoggingOut
+                        ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.logout_rounded, size: 22),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+
+          // ── My Location button (floating right) ───────────────────
+          Positioned(
+            right: 16,
+            bottom: 240,
+            child: GestureDetector(
+              onTap: () {
+                if (_currentLocation != null) _mapController.move(_currentLocation!, 15.0);
+              },
+              child: Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 12)],
+                ),
+                child: const Icon(Icons.my_location_rounded, color: Color(0xFFF59E0B), size: 22),
+              ),
+            ),
+          ),
+
+          // ── Bottom "Where to?" sheet ──────────────────────────────
+          Positioned(
+            left: 0, right: 0, bottom: 0,
+            child: Container(
               decoration: BoxDecoration(
-                color: AppConstants.primaryAmber,
-                borderRadius: BorderRadius.circular(8),
+                color: isDark ? const Color(0xFF111827) : Colors.white,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(28), topRight: Radius.circular(28)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, -4))],
               ),
-              child: const Icon(
-                Icons.local_taxi_rounded,
-                size: 20,
-                color: Colors.black,
-              ),
+              padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).padding.bottom + 20),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Handle
+                Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                Text('$greeting, $firstName', style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 14)),
+                const SizedBox(height: 4),
+                const Text('Where to?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26)),
+                const SizedBox(height: 16),
+
+                // Search bar — primary CTA
+                GestureDetector(
+                  onTap: () => AppNavigator.toRiderRequestRide(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1F2937) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.search_rounded, color: Color(0xFFF59E0B), size: 22),
+                      const SizedBox(width: 12),
+                      Text('Search destination', style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, fontSize: 16, fontWeight: FontWeight.w500)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Quick action buttons
+                Row(children: [
+                  Expanded(child: _quickAction(context, Icons.history_rounded, 'Recent', isDark, () => AppNavigator.toRiderHistory(context))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _quickAction(context, Icons.local_taxi_rounded, 'Ride Now', isDark, () => AppNavigator.toRiderRequestRide(context))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _quickAction(context, Icons.home_rounded, 'Home', isDark, () => AppNavigator.toRiderRequestRide(context))),
+                ]),
+              ]),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              '${AppConstants.appName} Rider',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: [
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: ThemeController.themeModeNotifier,
-            builder: (context, mode, _) {
-              final isDark = theme.brightness == Brightness.dark;
-              return IconButton(
-                icon: Icon(
-                  isDark
-                      ? Icons.light_mode_rounded
-                      : Icons.dark_mode_rounded,
-                ),
-                tooltip: isDark ? 'Switch to light mode' : 'Switch to dark mode',
-                onPressed: ThemeController.toggleTheme,
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_rounded),
-            tooltip: 'Profile',
-            onPressed: _handleProfile,
-          ),
-          IconButton(
-            icon: _isLoggingOut
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Icon(Icons.logout_rounded),
-            tooltip: 'Sign Out',
-            onPressed: _isLoggingOut ? null : _handleLogout,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppConstants.spaceXL),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Hello, $riderName',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppConstants.spaceXS),
-              Text(
-                "Where would you like to go?",
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppConstants.spaceXL),
-              Semantics(
-                label: 'Request a Ride',
-                button: true,
-                child: CustomButton(
-                  label: 'Request a Ride',
-                  icon: Icons.directions_car_rounded,
-                  onPressed: _handleRequestRide,
-                ),
-              ),
-              const SizedBox(height: AppConstants.spaceXXL),
-              const SectionHeader(
-                title: 'Get Started',
-                subtitle: 'Request a ride whenever you need one.',
-              ),
-              const SizedBox(height: AppConstants.spaceM),
-              const EmptyStateView(
-                icon: Icons.local_taxi_rounded,
-                title: 'No active ride',
-                description:
-                    "You don't have an active ride. Tap 'Request a Ride' above to get going, "
-                    "or view your past rides in History.",
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        onDestinationSelected: (index) {
-          if (index == 1) {
-            _handleHistory();
-          } else if (index == 2) {
-            _handleProfile();
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history_rounded),
-            label: 'History',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
           ),
         ],
       ),
     );
   }
+
+  Widget _quickAction(BuildContext ctx, IconData icon, String label, bool isDark, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 22, color: isDark ? Colors.white70 : Colors.black54),
+          const SizedBox(height: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black54)),
+        ]),
+      ),
+    );
+  }
 }
-
-
-

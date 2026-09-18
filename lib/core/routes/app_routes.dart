@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/state/auth_controller.dart';
 import '../../models/user_model.dart';
 import '../../models/ride_model.dart';
+import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/auth/driver_signup_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/signup_screen.dart';
@@ -63,6 +64,9 @@ class AppRoutes {
   static const String dispatcherHome = '/dispatcher/home';
   static const String dispatcherDriverData = '/dispatcher/driver-data';
   static const String dispatcherCandidates = '/dispatcher/candidates';
+
+  // Admin Control Center Routes
+  static const String adminHome = '/admin/home';
 
   /// Generates application routes based on [RouteSettings] with route protection.
   static Route<dynamic> generateRoute(
@@ -388,6 +392,21 @@ class AppRoutes {
           settings: settings,
         );
 
+      case adminHome:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        if (userRole != UserRole.admin) {
+          return _buildAccessErrorRoute(settings, 'Unauthorized. Admin access required.');
+        }
+        return MaterialPageRoute(
+          builder: (_) => AdminHomeScreen(authController: controller),
+          settings: settings,
+        );
+
       case dispatcherHome:
         if (!isAuthenticated) {
           return MaterialPageRoute(
@@ -555,8 +574,9 @@ class AppNavigator {
     final role = user?.role ?? AuthController.instance.currentUser?.role;
 
     switch (role) {
-      case UserRole.dispatcher:
       case UserRole.admin:
+        return toAdminHome(context, user);
+      case UserRole.dispatcher:
         return toDispatcherHome(context, user);
       case UserRole.driver:
         return toDriverHome(context, user);
@@ -564,6 +584,16 @@ class AppNavigator {
       default:
         return toRiderHome(context, user);
     }
+  }
+
+  /// Navigates to the Admin Home screen, clearing the entire back stack.
+  static Future<void> toAdminHome(BuildContext context, [UserModel? user]) {
+    return pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.adminHome,
+      (route) => false,
+      arguments: user,
+    );
   }
 
   /// Navigates to the Dispatcher Home screen, clearing the entire back stack.

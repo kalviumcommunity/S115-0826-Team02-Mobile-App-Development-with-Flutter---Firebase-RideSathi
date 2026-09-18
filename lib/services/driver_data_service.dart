@@ -7,6 +7,8 @@ import 'ride_service.dart';
 
 /// Service responsible for aggregating real-time driver operational data for dispatch.
 class DriverDataService {
+  static FirebaseFirestore? firestoreOverride;
+
   final FirebaseFirestore? firestore;
   final RideService _rideService;
 
@@ -15,7 +17,7 @@ class DriverDataService {
     RideService? rideService,
   }) : _rideService = rideService ?? RideService();
 
-  FirebaseFirestore get _instance => firestore ?? FirebaseFirestore.instance;
+  FirebaseFirestore get _instance => firestore ?? firestoreOverride ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _instance.collection('users');

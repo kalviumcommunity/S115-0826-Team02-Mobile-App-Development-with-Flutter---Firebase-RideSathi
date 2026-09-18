@@ -12,29 +12,54 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late AuthController _controller;
+
   @override
   void initState() {
     super.initState();
-    _checkAuth();
+    _controller = widget.authController ?? AuthController.instance;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.addListener(_onAuthStateChanged);
+      _controller.checkAuthStatus();
+    });
   }
 
-  Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 2));
+  void _onAuthStateChanged() {
     if (!mounted) return;
     
-    final controller = widget.authController ?? AuthController.instance;
-    if (controller.isAuthenticated) {
-      AppNavigator.toAuthenticatedHome(context, controller.currentUser);
-    } else {
-      AppNavigator.toLogin(context);
+    if (!_controller.isAuthenticating) {
+      _controller.removeListener(_onAuthStateChanged);
+      if (_controller.isAuthenticated) {
+        AppNavigator.toAuthenticatedHome(context, _controller.currentUser);
+      } else {
+        AppNavigator.toLogin(context);
+      }
     }
   }
 
   @override
+  void dispose() {
+    _controller.removeListener(_onAuthStateChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.local_taxi_rounded,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+          ],
+        ),
       ),
     );
   }

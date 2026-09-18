@@ -12,11 +12,10 @@ import '../../core/theme/theme_controller.dart';
 import '../../models/user_model.dart';
 import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
-import '../../widgets/info_card.dart';
 import '../../widgets/loading_view.dart';
-
-import '../../widgets/ride_summary_card.dart';
-import '../../widgets/union_badge.dart';
+import '../../services/real_location_service.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 /// Landing and dashboard screen for authenticated Drivers in RideSathi.
 ///
@@ -67,6 +66,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _ownsAcceptanceController = false;
   bool _ownsRejectionController = false;
 
+  final RealLocationService _locationService = RealLocationService();
+  final MapController _mapController = MapController();
+  LatLng? _currentLocation;
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +117,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         DriverAvailabilityController(authController: _authController);
 
     _availabilityController.addListener(_onAvailabilityStateChanged);
+    _initializeLocation();
+  }
+
+  Future<void> _initializeLocation() async {
+    try {
+      final loc = await _locationService.getCurrentLocation();
+      if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(loc.latitude ?? 28.6139, loc.longitude ?? 77.2090);
+        });
+        _mapController.move(_currentLocation!, 15.0);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _currentLocation = const LatLng(28.6139, 77.2090);
+        });
+      }
+    }
   }
 
   void _onRejectionStateChanged() {
@@ -237,651 +259,319 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     }
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    final month = months[dateTime.month - 1];
-    final hour = dateTime.hour == 0 ? 12 : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
-    final period = dateTime.hour < 12 ? 'AM' : 'PM';
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-
-    return '$month ${dateTime.day}, ${dateTime.year} - $hour:$minute $period';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final user = _currentUser;
-    final driverName = user?.name.isNotEmpty == true ? user!.name : 'Driver';
-    final vehicleInfo = user?.vehicleInfo?.isNotEmpty == true
-        ? user!.vehicleInfo!
-        : 'Vehicle details pending';
-    final isVerified = user?.isUnionVerified ?? false;
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: _authController,
+      builder: (context, _) {
+        final authState = _authController.state;
+        
+        if (authState.isAuthenticating) {
+          return const Scaffold(
+            body: Center(child: LoadingView(message: 'Loading driver profile...')),
+          );
+        }
+
+        final user = _currentUser;
+        if (user == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('RideSathi Driver')),
+            body: ErrorView(
+              message: 'Unable to resolve authenticated driver information. Please log in again.',
+              onRetry: _handleLogout,
+            ),
+          );
+        }
+
+        if (user.role != UserRole.driver) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Access Restricted')),
+            body: ErrorView(
+              message: 'You must be registered as a driver to access the driver console.',
+              onRetry: _handleLogout,
+            ),
+          );
+        }
+
+        final isVerified = user.isUnionVerified;
+
+        return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppConstants.primaryAmber,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.directions_car_rounded,
-                size: 20,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
+            Text(
               '${AppConstants.appName} Driver',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
+            if (isVerified)
+              Text(
+                'Union Verified',
+                style: theme.textTheme.labelSmall?.copyWith(color: Colors.green),
+              ),
           ],
         ),
         actions: [
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: ThemeController.themeModeNotifier,
-            builder: (context, mode, _) {
-              return IconButton(
-                icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                ),
-                tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
-                onPressed: () => ThemeController.toggleTheme(),
-              );
-            },
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: ThemeController.toggleTheme,
           ),
           IconButton(
-            icon: const Icon(Icons.history_rounded),
-            tooltip: 'History',
-            onPressed: () => AppNavigator.pushNamed(context, AppRoutes.driverHistory),
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline_rounded),
-            tooltip: 'Profile',
+            icon: const Icon(Icons.person_outline),
             onPressed: () => AppNavigator.toProfile(context),
           ),
           IconButton(
             icon: _isLoggingOut
-                ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        theme.colorScheme.onSurface,
-                      ),
-                    ),
-                  )
-                : const Icon(Icons.logout_rounded),
-            tooltip: 'Log Out',
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.logout),
             onPressed: _isLoggingOut ? null : _handleLogout,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppConstants.spaceXL,
-          vertical: AppConstants.spaceL,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Driver Welcome Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppConstants.spaceXL),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [AppConstants.accentNavy, const Color(0xFF334155)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(AppConstants.radiusPill),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+      body: Stack(
+        children: [
+          // Background Interactive Map
+          Positioned.fill(
+            child: _currentLocation == null 
+              ? const Center(child: CircularProgressIndicator())
+              : FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _currentLocation!,
+                    initialZoom: 15.0,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const UnionBadge(),
-                  const SizedBox(height: 14),
-                  Text(
-                    'Welcome, $driverName',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    user?.phoneNumber.isNotEmpty == true
-                        ? 'Driver Console • ${user!.phoneNumber}'
-                        : 'Union Fleet Operator & Driver Console',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFFCBD5E1),
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spaceL),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.spaceM,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppConstants.primaryAmber.withValues(alpha: 0.2),
-                          borderRadius:
-                              BorderRadius.circular(AppConstants.radiusS),
-                          border: Border.all(
-                            color:
-                                AppConstants.primaryAmber.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.drive_eta_rounded,
-                              size: 16,
-                              color: AppConstants.primaryAmber,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Driver Role Active',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: AppConstants.spaceM),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.spaceM,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isVerified
-                              ? Colors.green.withValues(alpha: 0.2)
-                              : Colors.orange.withValues(alpha: 0.2),
-                          borderRadius:
-                              BorderRadius.circular(AppConstants.radiusS),
-                          border: Border.all(
-                            color: isVerified
-                                ? Colors.green.withValues(alpha: 0.4)
-                                : Colors.orange.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Text(
-                          isVerified ? 'Union Verified' : 'Pending Verification',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isVerified ? Colors.greenAccent : Colors.orangeAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // Driver Availability Card (Functional)
-            Card(
-              elevation: 0,
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                side: BorderSide(
-                  color: _availabilityController.isOnline
-                      ? Colors.green.withValues(alpha: 0.5)
-                      : theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppConstants.spaceL),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: _availabilityController.isOnline
-                                ? Colors.green.withValues(alpha: 0.15)
-                                : theme.colorScheme.surfaceContainerHighest,
-                            borderRadius:
-                                BorderRadius.circular(AppConstants.radiusM),
-                          ),
-                          child: Icon(
-                            _availabilityController.isOnline
-                                ? Icons.sensors_rounded
-                                : Icons.sensors_off_rounded,
-                            color: _availabilityController.isOnline ? Colors.green : Colors.grey,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: AppConstants.spaceM),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Driver Availability',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _availabilityController.isOnline
-                                    ? 'You are currently available for new rides.'
-                                    : 'You are currently not available for new rides.',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppConstants.spaceS),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _availabilityController.isOnline
-                                ? Colors.green.withValues(alpha: 0.15)
-                                : Colors.grey.withValues(alpha: 0.15),
-                            borderRadius:
-                                BorderRadius.circular(AppConstants.radiusPill),
-                            border: Border.all(
-                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.ridesathi.driver',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _currentLocation!,
+                          width: 40,
+                          height: 40,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
                             ),
-                          ),
-                          child: Text(
-                            _availabilityController.isOnline ? 'Online' : 'Offline',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: _availabilityController.isOnline ? Colors.green : Colors.grey,
+                            child: Center(
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppConstants.spaceM),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _availabilityController.isUpdating
+                  ],
+                ),
+          ),
+          
+          SafeArea(
+            child: Column(
+              children: [
+                // Prominent Availability Toggle Header overlay
+                Container(
+                  margin: const EdgeInsets.all(AppConstants.spaceM),
+                  padding: const EdgeInsets.all(AppConstants.spaceL),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Status',
+                            style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _availabilityController.isOnline ? 'Online & Ready' : 'Offline',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: _availabilityController.isOnline ? Colors.green : theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: _availabilityController.isOnline,
+                        onChanged: _availabilityController.isUpdating
                             ? null
-                            : _handleToggleAvailability,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _availabilityController.isOnline
-                              ? Colors.red.shade700
-                              : AppConstants.primaryAmber,
-                          foregroundColor:
-                              _availabilityController.isOnline ? Colors.white : Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: _availabilityController.isUpdating
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                            : (val) => _handleToggleAvailability(),
+                        activeThumbColor: Colors.green,
+                        activeTrackColor: Colors.green.withValues(alpha: 0.2),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _requestsController,
+                    builder: (context, _) {
+                      if (!_requestsController.isOnline) {
+                        return const SizedBox.shrink(); // Show full map when offline
+                      }
+
+                      final state = _requestsController.state;
+                      
+                      if (state.isEmpty || state.data == null || state.data!.isEmpty) {
+                        return const SizedBox.shrink(); // Show full map when waiting for requests
+                      }
+
+                      final requests = state.data!;
+                      
+                      // Show requests in a horizontal scrollable list or bottom sheet
+                      return Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Container(
+                          height: 300,
+                          margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
+                          child: PageView.builder(
+                            itemCount: requests.length,
+                            controller: PageController(viewportFraction: 0.9),
+                            itemBuilder: (context, index) {
+                              final ride = requests[index];
+                              return Card(
+                                elevation: 8,
+                                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                shadowColor: Colors.black26,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: theme.colorScheme.primaryContainer,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              '₹${ride.estimatedFare.toStringAsFixed(0)}',
+                                              style: theme.textTheme.titleLarge?.copyWith(
+                                                color: theme.colorScheme.onPrimaryContainer,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          Text(
+                                            'New Request',
+                                            style: theme.textTheme.labelMedium?.copyWith(color: Colors.red, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.my_location, size: 20, color: Colors.blue),
+                                          const SizedBox(width: 12),
+                                          Expanded(child: Text(ride.pickup.address.isEmpty ? 'Pending' : ride.pickup.address, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                        ],
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 9),
+                                        child: SizedBox(height: 16, child: VerticalDivider(width: 2, color: Colors.grey)),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.location_on, size: 20, color: Colors.red),
+                                          const SizedBox(width: 12),
+                                          Expanded(child: Text(ride.destination.address.isEmpty ? 'Pending' : ride.destination.address, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                        ],
+                                      ),
+                                      const Spacer(),
+                                      AnimatedBuilder(
+                                        animation: Listenable.merge([_acceptanceController, _rejectionController]),
+                                        builder: (context, _) {
+                                          final isAccepting = _acceptanceController.state.isLoading;
+                                          final isRejecting = _rejectionController.state.isLoading;
+                                          final isBusy = isAccepting || isRejecting;
+
+                                          return Row(
+                                            children: [
+                                              Expanded(
+                                                child: OutlinedButton(
+                                                  onPressed: isBusy ? null : () => _rejectionController.rejectRide(ride.id),
+                                                  style: OutlinedButton.styleFrom(
+                                                    foregroundColor: Colors.red,
+                                                    side: const BorderSide(color: Colors.red),
+                                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                  ),
+                                                  child: isRejecting 
+                                                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                                      : const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: ElevatedButton(
+                                                  onPressed: isBusy ? null : () => _acceptanceController.acceptRide(ride.id),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.black,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                  ),
+                                                  child: isAccepting
+                                                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                      : const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              )
-                            : Icon(
-                                _availabilityController.isOnline
-                                    ? Icons.power_settings_new_rounded
-                                    : Icons.bolt_rounded,
-                              ),
-                        label: Text(
-                          _availabilityController.isUpdating
-                              ? 'Updating...'
-                              : (_availabilityController.isOnline ? 'Go Offline' : 'Go Online'),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                              );
+                            },
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-
-            
-            const SizedBox(height: AppConstants.spaceXL),
-
-            // Active Ride Banner — shown when driver has an accepted ride
-            AnimatedBuilder(
-              animation: _activeRideController,
-              builder: (context, _) {
-                final activeRide = _activeRideController.activeRide;
-                if (activeRide == null) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Active Ride',
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: AppConstants.spaceM),
-                    Card(
-                      color: isDark
-                          ? const Color(0xFF064E3B)
-                          : const Color(0xFFECFDF5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                        side: const BorderSide(color: Colors.green, width: 1.5),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppConstants.spaceL),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.check_circle_rounded,
-                                    color: Colors.green, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Ride Accepted',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? Colors.greenAccent
-                                        : const Color(0xFF065F46),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppConstants.spaceM),
-                            Text(
-                              'Pickup: ${activeRide.pickup.address.trim().isNotEmpty ? activeRide.pickup.address : 'Pending'}',
-                              style: theme.textTheme.bodySmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Drop: ${activeRide.destination.address.trim().isNotEmpty ? activeRide.destination.address : 'Pending'}',
-                              style: theme.textTheme.bodySmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: AppConstants.spaceM),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    AppNavigator.toDriverActiveRide(context),
-                                icon: const Icon(Icons.open_in_new_rounded,
-                                    size: 18),
-                                label: const Text('Open Active Ride'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                        AppConstants.radiusM),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppConstants.spaceXL),
-                  ],
-                );
-              },
-            ),
-
-            // Incoming Ride Requests Section Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Incoming Ride Requests',
-                  style: theme.textTheme.titleLarge,
-                ),
-                AnimatedBuilder(
-                  animation: _requestsController,
-                  builder: (context, _) {
-                    final count = _requestsController.requestCount;
-                    if (!_requestsController.isOnline || count == 0) {
-                      return const SizedBox.shrink();
-                    }
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$count Active',
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: AppConstants.spaceM),
-
-            // Incoming Ride Requests List / Content
-            AnimatedBuilder(
-              animation: _requestsController,
-              builder: (context, _) {
-                if (!_requestsController.isOnline) {
-                  return const EmptyStateView(
-                    title: 'Driver is Offline',
-                    description: 'Switch your availability to Online above to receive incoming ride requests.',
-                    icon: Icons.wifi_off_rounded,
-                  );
-                }
-
-                final state = _requestsController.state;
-
-                if (state.isLoading) {
-                  return const LoadingView(
-                    message: 'Checking incoming requests...',
-                  );
-                }
-
-                if (state.isError) {
-                  return ErrorView(
-                    message: state.message ?? 'Failed to load incoming requests.',
-                    onRetry: () => _requestsController.startListening(),
-                  );
-                }
-
-                if (state.isEmpty || state.data == null || state.data!.isEmpty) {
-                  return const EmptyStateView(
-                    title: 'No incoming ride requests',
-                    description: 'You are online. Eligible ride requests assigned to you will appear here automatically.',
-                    icon: Icons.inbox_rounded,
-                  );
-                }
-
-                final requests = state.data!;
-
-                return Column(
-                  children: requests.map((ride) {
-                    return RideSummaryCard(
-                      pickupAddress: ride.pickup.address.trim().isNotEmpty
-                          ? ride.pickup.address
-                          : 'Pickup address pending',
-                      dropoffAddress: ride.destination.address.trim().isNotEmpty
-                          ? ride.destination.address
-                          : 'Destination address pending',
-                      status: ride.status.name,
-                      dateTime: ride.createdAt != null ? _formatDateTime(ride.createdAt!) : 'Unknown',
-                      fare: '₹${ride.estimatedFare.toStringAsFixed(0)}',
-                      vehicleInfo: 'Vehicle: ${ride.vehicleType.name}',
-                      onTap: () {
-                        // Request detail preview / inspect action (PR 33 read-only)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Inspecting request #${ride.id}. Accept/Reject actions active in PR 34/35.',
-                            ),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      actionButton: AnimatedBuilder(
-                        animation: Listenable.merge([_acceptanceController, _rejectionController]),
-                        builder: (context, _) {
-                          final isAccepting = _acceptanceController.state.isLoading;
-                          final isRejecting = _rejectionController.state.isLoading;
-                          final isBusy = isAccepting || isRejecting;
-
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: isBusy
-                                      ? null
-                                      : () => _rejectionController.rejectRide(ride.id),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                    side: BorderSide(
-                                      color: isBusy ? Colors.grey : Colors.red,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                                    ),
-                                  ),
-                                  icon: isRejecting
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                                          ),
-                                        )
-                                      : const Icon(Icons.close_rounded),
-                                  label: Text(
-                                    isRejecting ? 'Rejecting...' : 'Reject',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: AppConstants.spaceM),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: isBusy
-                                      ? null
-                                      : () => _acceptanceController.acceptRide(ride.id),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                                    ),
-                                  ),
-                                  icon: isAccepting
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          ),
-                                        )
-                                      : const Icon(Icons.check_circle_outline_rounded),
-                                  label: Text(
-                                    isAccepting ? 'Accepting...' : 'Accept Ride',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-
-            const SizedBox(height: AppConstants.spaceXL),
-
-            // Registered Vehicle Details
-            Text(
-              'Vehicle & Union Status',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppConstants.spaceM),
-
-            InfoCard(
-              title: 'Registered Vehicle',
-              description: vehicleInfo,
-              icon: Icons.electric_rickshaw_rounded,
-              iconColor: AppConstants.primaryAmber,
-              badgeText: 'Active',
-              badgeColor: Colors.blue,
-            ),
-
-            InfoCard(
-              title: 'Union Verification Status',
-              description: isVerified
-                  ? 'Your union credentials and vehicle permit are fully verified.'
-                  : 'Document review in progress by regional union administrators.',
-              icon: isVerified
-                  ? Icons.verified_user_rounded
-                  : Icons.pending_actions_rounded,
-              iconColor: isVerified ? Colors.green : Colors.orange,
-              badgeText: isVerified ? 'Verified' : 'Pending',
-              badgeColor: isVerified ? Colors.green : Colors.orange,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+      },
     );
   }
 }

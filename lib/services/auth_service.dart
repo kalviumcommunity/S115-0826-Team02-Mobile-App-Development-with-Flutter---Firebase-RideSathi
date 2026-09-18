@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import 'service_exception.dart';
@@ -94,9 +95,12 @@ class AuthService {
       final credential = await _instance.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      );
+      ).timeout(const Duration(seconds: 15));
       return _userFromFirebase(credential.user);
     } catch (e) {
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw AuthException.from(e);
     }
   }
@@ -114,9 +118,12 @@ class AuthService {
       final credential = await _instance.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      );
+      ).timeout(const Duration(seconds: 15));
       return _userFromFirebase(credential.user, name: name, phone: phone, role: role, vehicleInfo: vehicleInfo);
     } catch (e) {
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw AuthException.from(e);
     }
   }
@@ -124,8 +131,11 @@ class AuthService {
   /// Signs out the current user session.
   Future<void> userSignOut() async {
     try {
-      await _instance.signOut();
+      await _instance.signOut().timeout(const Duration(seconds: 15));
     } catch (e) {
+      if (e is TimeoutException || e.toString().contains('TimeoutException')) {
+        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+      }
       throw AuthException.from(e);
     }
   }

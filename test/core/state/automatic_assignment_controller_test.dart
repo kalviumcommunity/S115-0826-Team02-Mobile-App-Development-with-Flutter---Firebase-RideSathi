@@ -1,4 +1,10 @@
+import 'package:ridesathi/services/fallback_matching_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/automatic_assignment_controller.dart';
 import 'package:ridesathi/core/state/fallback_matching_controller.dart';
 import 'package:ridesathi/models/candidate_evaluation.dart';
@@ -7,7 +13,26 @@ import 'package:ridesathi/models/matching_attempt_state.dart';
 import 'package:ridesathi/services/ride_service.dart';
 import 'package:ridesathi/core/state/view_state.dart';
 
+import 'package:ridesathi/services/nearest_driver_service.dart';
+import 'package:ridesathi/core/state/auth_controller.dart';
+
+class _DummyNearestDriverService implements NearestDriverService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _DummyFallbackMatchingService implements FallbackMatchingService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _FakeFallbackController extends FallbackMatchingController {
+  _FakeFallbackController(RideService rs) : super(
+    nearestDriverService: _DummyNearestDriverService(),
+    fallbackService: _DummyFallbackMatchingService(),
+    authController: AuthController(listenToAuthChanges: false),
+  );
+
   MatchingAttemptState _fakeState = const MatchingAttemptState();
   String? _fakeActiveRideId;
 
@@ -42,8 +67,13 @@ void main() {
   late AutomaticAssignmentController controller;
 
   setUp(() {
-    fallbackController = _FakeFallbackController();
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
     rideService = _FakeRideService();
+    fallbackController = _FakeFallbackController(rideService);
     controller = AutomaticAssignmentController(
       fallbackController: fallbackController,
       rideService: rideService,
