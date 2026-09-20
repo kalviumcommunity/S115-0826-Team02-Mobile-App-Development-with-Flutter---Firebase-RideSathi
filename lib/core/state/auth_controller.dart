@@ -1,5 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firebase_service.dart';
@@ -32,9 +35,9 @@ class AuthController extends ChangeNotifier {
     UserProfileService? userProfileService,
     AuthState initialState = const AuthState.initial(),
     bool listenToAuthChanges = false,
-  })  : _authService = authService ?? const AuthService(),
-        _userProfileService = userProfileService ?? const UserProfileService(),
-        _state = initialState {
+  }) : _authService = authService ?? const AuthService(),
+       _userProfileService = userProfileService ?? const UserProfileService(),
+       _state = initialState {
     if (listenToAuthChanges) {
       _subscribeToAuthChanges();
     }
@@ -71,7 +74,8 @@ class AuthController extends ChangeNotifier {
   /// Returns `true` if state was updated, `false` otherwise.
   bool updateCurrentUser(UserModel updatedUser, {int? expectedGeneration}) {
     if (_isDisposed) return false;
-    if (expectedGeneration != null && _sessionGeneration != expectedGeneration) {
+    if (expectedGeneration != null &&
+        _sessionGeneration != expectedGeneration) {
       return false;
     }
     if (!_state.isAuthenticated || _state.user?.id != updatedUser.id) {
@@ -94,7 +98,9 @@ class AuthController extends ChangeNotifier {
   void _subscribeToAuthChanges() {
     try {
       _authSubscription?.cancel();
-      _authSubscription = _authService.onAuthStateChanged.listen((UserModel? authUser) async {
+      _authSubscription = _authService.onAuthStateChanged.listen((
+        UserModel? authUser,
+      ) async {
         if (_isDisposed) return;
 
         if (authUser == null) {
@@ -131,7 +137,10 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Resolves the user's Firestore domain profile document and updates state accordingly.
-  Future<UserModel?> _restoreDomainProfile(String uid, [int? expectedGeneration]) async {
+  Future<UserModel?> _restoreDomainProfile(
+    String uid, [
+    int? expectedGeneration,
+  ]) async {
     final gen = expectedGeneration ?? _sessionGeneration;
     try {
       final profile = await _userProfileService.getUserProfile(uid);
@@ -142,9 +151,11 @@ class AuthController extends ChangeNotifier {
         _setState(AuthState.authenticated(profile));
         return profile;
       } else {
-        _setState(const AuthState.error(
-          'User session active, but profile could not be found.',
-        ));
+        _setState(
+          const AuthState.error(
+            'User session active, but profile could not be found.',
+          ),
+        );
         return null;
       }
     } on FirestoreException catch (e) {
@@ -157,9 +168,9 @@ class AuthController extends ChangeNotifier {
       if (_isDisposed || _sessionGeneration != gen || _restoringUid != uid) {
         return null;
       }
-      _setState(const AuthState.error(
-        'Failed to load user profile. Please try again.',
-      ));
+      _setState(
+        const AuthState.error('Failed to load user profile. Please try again.'),
+      );
       return null;
     }
   }
@@ -184,9 +195,11 @@ class AuthController extends ChangeNotifier {
   Future<void> _performCheckAuthStatus() async {
     if (!FirebaseService.isInitialized) {
       if (FirebaseService.initializationError != null) {
-        _setState(const AuthState.error(
-          'RideSathi could not connect to its services. Please check your internet connection and try again.',
-        ));
+        _setState(
+          const AuthState.error(
+            'RideSathi could not connect to its services. Please check your internet connection and try again.',
+          ),
+        );
       } else {
         _setState(const AuthState.unauthenticated());
       }
@@ -222,10 +235,7 @@ class AuthController extends ChangeNotifier {
   }
 
   /// Signs in a user with email and password and resolves their Firestore domain profile.
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     _setState(AuthState.authenticating(previousUser: _state.user));
     final currentGen = ++_sessionGeneration;
     try {
@@ -244,9 +254,11 @@ class AuthController extends ChangeNotifier {
         final profile = await _userProfileService.getUserProfile(authUser.id);
         if (_isDisposed || _sessionGeneration != currentGen) return false;
         if (profile == null) {
-          _setState(const AuthState.error(
-            'User profile not found. Please contact support or register again.',
-          ));
+          _setState(
+            const AuthState.error(
+              'User profile not found. Please contact support or register again.',
+            ),
+          );
           return false;
         }
         _setState(AuthState.authenticated(profile));
@@ -257,9 +269,11 @@ class AuthController extends ChangeNotifier {
         return false;
       } catch (e) {
         if (_isDisposed || _sessionGeneration != currentGen) return false;
-        _setState(const AuthState.error(
-          'Failed to load user profile. Please try again.',
-        ));
+        _setState(
+          const AuthState.error(
+            'Failed to load user profile. Please try again.',
+          ),
+        );
         return false;
       } finally {
         if (_restoringUid == authUser.id) {
@@ -276,9 +290,11 @@ class AuthController extends ChangeNotifier {
       return false;
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentGen) return false;
-      _setState(const AuthState.error(
-        'An unexpected error occurred. Please try again.',
-      ));
+      _setState(
+        const AuthState.error(
+          'An unexpected error occurred. Please try again.',
+        ),
+      );
       return false;
     }
   }
@@ -303,10 +319,13 @@ class AuthController extends ChangeNotifier {
         try {
           await _userProfileService.createRiderProfile(user);
         } catch (e) {
+          try {
+            await FirebaseAuth.instance.currentUser?.delete();
+          } catch (_) {}
           if (_isDisposed || _sessionGeneration != currentGen) return false;
           final errorMsg = e is FirestoreException
               ? e.message
-              : 'Account created, but failed to save rider profile.';
+              : 'Account created, but failed to save rider profile. Please try again.';
           _setState(AuthState.error(errorMsg));
           return false;
         }
@@ -328,9 +347,11 @@ class AuthController extends ChangeNotifier {
       return false;
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentGen) return false;
-      _setState(const AuthState.error(
-        'An unexpected error occurred. Please try again.',
-      ));
+      _setState(
+        const AuthState.error(
+          'An unexpected error occurred. Please try again.',
+        ),
+      );
       return false;
     }
   }
@@ -358,10 +379,13 @@ class AuthController extends ChangeNotifier {
         try {
           await _userProfileService.createDriverProfile(user);
         } catch (e) {
+          try {
+            await FirebaseAuth.instance.currentUser?.delete();
+          } catch (_) {}
           if (_isDisposed || _sessionGeneration != currentGen) return false;
           final errorMsg = e is FirestoreException
               ? e.message
-              : 'Account created, but failed to save driver profile.';
+              : 'Account created, but failed to save driver profile. Please try again.';
           _setState(AuthState.error(errorMsg));
           return false;
         }
@@ -383,9 +407,11 @@ class AuthController extends ChangeNotifier {
       return false;
     } catch (e) {
       if (_isDisposed || _sessionGeneration != currentGen) return false;
-      _setState(const AuthState.error(
-        'An unexpected error occurred. Please try again.',
-      ));
+      _setState(
+        const AuthState.error(
+          'An unexpected error occurred. Please try again.',
+        ),
+      );
       return false;
     }
   }
@@ -422,10 +448,12 @@ class AuthController extends ChangeNotifier {
       _setState(AuthState.error(e.message, previousUser: _state.user));
       return false;
     } catch (e) {
-      _setState(AuthState.error(
-        'Failed to sign out. Please try again.',
-        previousUser: _state.user,
-      ));
+      _setState(
+        AuthState.error(
+          'Failed to sign out. Please try again.',
+          previousUser: _state.user,
+        ),
+      );
       return false;
     }
   }

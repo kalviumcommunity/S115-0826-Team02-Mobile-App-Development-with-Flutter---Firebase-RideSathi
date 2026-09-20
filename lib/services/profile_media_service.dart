@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../core/utils/future_timeout_extension.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'storage_exception.dart';
 
@@ -54,7 +55,7 @@ class ProfileMediaService {
         throw const StorageException('Document exceeds 10MB limit.', code: 'quota-exceeded');
       }
 
-      final uploadTask = await ref.putFile(documentFile);
+      final uploadTask = await ref.putFile(documentFile).withNetworkTimeout();
       
       return await uploadTask.ref.getDownloadURL();
     } catch (e) {
@@ -75,7 +76,7 @@ class ProfileMediaService {
         throw const StorageException('Unauthorized deletion attempt.', code: 'unauthorized');
       }
 
-      await ref.delete();
+      await ref.delete().withNetworkTimeout();
     } catch (e) {
       if (e is FirebaseException && e.code == 'object-not-found') {
         return; // File already deleted or doesn't exist

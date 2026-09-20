@@ -85,7 +85,7 @@ class LocationSharingStatusBanner extends StatelessWidget {
                   ),
                 ),
               ),
-              if (actionButton != null) actionButton,
+              ?actionButton,
             ],
           ),
         );

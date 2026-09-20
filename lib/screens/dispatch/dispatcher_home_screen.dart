@@ -143,35 +143,45 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
         title: msg ?? 'No rides found',
       ),
       success: (rides) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppConstants.spaceM),
-          itemCount: rides.length,
-          itemBuilder: (context, index) {
-            final ride = rides[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
-              child: ListTile(
-                title: Text('Ride: ${ride.id.substring(0, 8)}...'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pickup: ${ride.pickup.displayName}'),
-                    Text('Destination: ${ride.destination.displayName}'),
-                    const SizedBox(height: AppConstants.spaceS),
-                    Text('Created: ${ride.createdAt?.toLocal().toString().split('.').first ?? "Unknown"}'),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SingleChildScrollView(
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.surfaceContainerHighest),
+              columns: const [
+                DataColumn(label: Text('ID')),
+                DataColumn(label: Text('Pickup')),
+                DataColumn(label: Text('Destination')),
+                DataColumn(label: Text('Time')),
+                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Actions')),
+              ],
+              rows: rides.map((ride) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(ride.id.substring(0, 8))),
+                    DataCell(Text(ride.pickup.displayName, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    DataCell(Text(ride.destination.displayName, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    DataCell(Text(ride.createdAt?.toLocal().toString().split('.').first ?? "Unknown")),
+                    DataCell(StatusBadge(status: ride.status.name)),
+                    DataCell(
+                      TextButton.icon(
+                        icon: const Icon(Icons.person_add, size: 16),
+                        label: const Text('Assign'),
+                        onPressed: () {
+                          AppNavigator.pushNamed(
+                            context,
+                            AppRoutes.dispatcherCandidates,
+                            arguments: ride,
+                          );
+                        },
+                      ),
+                    ),
                   ],
-                ),
-                trailing: StatusBadge(status: ride.status.name),
-                onTap: () {
-                  AppNavigator.pushNamed(
-                    context, 
-                    AppRoutes.dispatcherCandidates,
-                    arguments: ride,
-                  );
-                },
-              ),
-            );
-          },
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );
@@ -193,37 +203,43 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
         title: msg ?? 'No rides found',
       ),
       success: (rides) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppConstants.spaceM),
-          itemCount: rides.length,
-          itemBuilder: (context, index) {
-            final ride = rides[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
-              child: ListTile(
-                title: Text('Driver: ${ride.driverId ?? "Unknown"}'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pickup: ${ride.pickup.displayName}'),
-                    Text('Destination: ${ride.destination.displayName}'),
-                    Text('Updated: ${ride.updatedAt?.toLocal().toString().split('.').first ?? "Unknown"}'),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SingleChildScrollView(
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.surfaceContainerHighest),
+              columns: const [
+                DataColumn(label: Text('Driver ID')),
+                DataColumn(label: Text('Pickup')),
+                DataColumn(label: Text('Destination')),
+                DataColumn(label: Text('Status')),
+                DataColumn(label: Text('Actions')),
+              ],
+              rows: rides.map((ride) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(ride.driverId ?? "Unknown")),
+                    DataCell(Text(ride.pickup.displayName)),
+                    DataCell(Text(ride.destination.displayName)),
+                    DataCell(StatusBadge(status: ride.status.name)),
+                    DataCell(
+                      TextButton.icon(
+                        icon: const Icon(Icons.info_outline, size: 16),
+                        label: const Text('Details'),
+                        onPressed: () => _showActiveRideDetails(ride),
+                      ),
+                    ),
                   ],
-                ),
-                trailing: StatusBadge(status: ride.status.name),
-                onTap: () {
-                  _showActiveRideDetails(ride);
-                },
-              ),
-            );
-          },
+                );
+              }).toList(),
+            ),
+          ),
         );
       },
     );
   }
 
   void _showActiveRideDetails(RideModel ride) {
-    // A simple dialog for now, can be extracted to a full screen if needed.
     showDialog(
       context: context,
       builder: (context) {
@@ -243,7 +259,7 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
                 Text('Rider ID: ${ride.riderId}'),
                 Text('Driver ID: ${ride.driverId ?? "None"}'),
                 Text('Vehicle Type: ${ride.vehicleType.name}'),
-                Text('Fare: ${ride.estimatedFare}'),
+                Text('Fare: ₹${ride.estimatedFare.toStringAsFixed(0)}'),
               ],
             ),
           ),
@@ -325,42 +341,64 @@ class _DispatcherHomeScreenState extends State<DispatcherHomeScreen> {
               title: msg ?? 'No drivers found',
             ),
             success: (drivers) {
-              return ListView.builder(
-                padding: const EdgeInsets.all(AppConstants.spaceM),
-                itemCount: drivers.length,
-                itemBuilder: (context, index) {
-                  final driver = drivers[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: AppConstants.spaceM),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: driver.isOnline ? Colors.green.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.2),
-                        child: Icon(
-                          driver.isOnline ? Icons.person : Icons.person_off,
-                          color: driver.isOnline ? Colors.green : Colors.grey,
-                        ),
-                      ),
-                      title: Text(driver.name),
-                      subtitle: Text(driver.vehicleInfo ?? 'Unknown vehicle'),
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (driver.activeRideId != null)
-                            const Text('On Active Ride', style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.bold))
-                          else if (driver.isOnline)
-                            const Text('Available', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold))
-                          else
-                            const Text('Offline', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-                          
-                          if (driver.isUnionVerified)
-                            const Icon(Icons.verified, size: 16, color: Colors.blue)
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.surfaceContainerHighest),
+                    columns: const [
+                      DataColumn(label: Text('Name')),
+                      DataColumn(label: Text('Vehicle')),
+                      DataColumn(label: Text('Status')),
+                      DataColumn(label: Text('Verified')),
+                      DataColumn(label: Text('Actions')),
+                    ],
+                    rows: drivers.map((driver) {
+                      String statusText = 'Offline';
+                      Color statusColor = Colors.grey;
+                      if (driver.activeRideId != null) {
+                        statusText = 'On Ride';
+                        statusColor = Colors.orange;
+                      } else if (driver.isOnline) {
+                        statusText = 'Available';
+                        statusColor = Colors.green;
+                      }
+
+                      return DataRow(
+                        cells: [
+                          DataCell(Text(driver.name, style: const TextStyle(fontWeight: FontWeight.bold))),
+                          DataCell(Text(driver.vehicleInfo ?? 'Unknown vehicle')),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: statusColor),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            driver.isUnionVerified
+                                ? const Icon(Icons.verified, size: 20, color: Colors.blue)
+                                : const Icon(Icons.pending, size: 20, color: Colors.grey),
+                          ),
+                          DataCell(
+                            TextButton.icon(
+                              icon: const Icon(Icons.info_outline, size: 16),
+                              label: const Text('Details'),
+                              onPressed: () => _showDriverDetails(driver),
+                            ),
+                          ),
                         ],
-                      ),
-                      onTap: () => _showDriverDetails(driver),
-                    ),
-                  );
-                },
+                      );
+                    }).toList(),
+                  ),
+                ),
               );
             },
           ),

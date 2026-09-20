@@ -68,7 +68,21 @@ class RideRejectionController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _rideService.rejectRide(rideId, driverId);
+      // For broadcast requests (no explicit assignment), just locally reject.
+      // A more complex app would have the backend filter this, but for now we handle it client-side.
+      _requestsController.locallyReject(rideId);
+      
+      // Still attempt to reject on the server if it WAS explicitly assigned to us.
+      // We wrap this in a try-catch and ignore "Not assigned to you" errors.
+      try {
+        await _rideService.rejectRide(rideId, driverId);
+      } on FirestoreException catch (e) {
+        if (e.message.contains('Not assigned to you')) {
+          // This is expected for broadcast requests, safe to ignore.
+        } else {
+          rethrow;
+        }
+      }
 
       if (_isDisposed || _authController.sessionGeneration != currentGen) {
         return false; // Stale session, discard result

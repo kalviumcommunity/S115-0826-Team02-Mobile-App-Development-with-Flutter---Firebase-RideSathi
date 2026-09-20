@@ -1,3 +1,4 @@
+import '../core/utils/future_timeout_extension.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/driver_location.dart';
 import '../models/ride_model.dart';
@@ -6,10 +7,12 @@ import 'firestore_exception.dart';
 
 /// Service handling Firestore persistence for Ride operations.
 class RideService {
+  static FirebaseFirestore? firestoreOverride;
+
   final FirebaseFirestore _firestore;
 
   RideService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? firestoreOverride ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _rides =>
       _firestore.collection('rides');
@@ -33,7 +36,7 @@ class RideService {
         destination: draft.destination!,
         vehicleType: VehicleType.autoRickshaw, // Default for now
         status: RideStatus.requested,
-        estimatedFare: 150.0, // Default for now
+        estimatedFare: draft.estimatedFare ?? 150.0,
         // Model layer doesn't dictate timestamp anymore
       );
 
@@ -41,7 +44,7 @@ class RideService {
       payload['createdAt'] = FieldValue.serverTimestamp();
       payload['updatedAt'] = FieldValue.serverTimestamp();
 
-      await docRef.set(payload);
+      await docRef.set(payload).withNetworkTimeout();
 
       return rideToSave;
     } catch (e) {
@@ -102,7 +105,7 @@ class RideService {
       
       // Ownership validation: We conditionally update only if the driverId matches.
       // Since we don't have backend security rules yet, we will fetch and verify client-side.
-      final snapshot = await docRef.get();
+      final snapshot = await docRef.get().withNetworkTimeout();
       if (!snapshot.exists) {
         throw const FirestoreException('Ride not found.', code: 'not-found');
       }
@@ -116,7 +119,7 @@ class RideService {
       await docRef.update({
         'driverLocation': location.toMap(),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }).withNetworkTimeout();
     } catch (e) {
       if (e is FirestoreException) rethrow;
       throw FirestoreException.from(e);
@@ -139,7 +142,7 @@ class RideService {
     try {
       final docRef = _rides.doc(rideId.trim());
       
-      final snapshot = await docRef.get();
+      final snapshot = await docRef.get().withNetworkTimeout();
       if (!snapshot.exists) {
         throw const FirestoreException('Ride not found.', code: 'not-found');
       }
@@ -156,7 +159,7 @@ class RideService {
       await docRef.update({
         'status': RideStatus.cancelled.name,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }).withNetworkTimeout();
     } catch (e) {
       if (e is FirestoreException) rethrow;
       throw FirestoreException.from(e);
@@ -182,7 +185,7 @@ class RideService {
 
       await _firestore.runTransaction((transaction) async {
         // Read user document for cross-document validation
-        final userSnap = await transaction.get(userRef);
+        final userSnap = await transaction.get(userRef).withNetworkTimeout();
         if (!userSnap.exists) {
           throw const FirestoreException('Driver profile not found.', code: 'not-found');
         }
@@ -192,7 +195,7 @@ class RideService {
            throw const FirestoreException('Driver is no longer online.', code: 'unavailable');
         }
 
-        final snapshot = await transaction.get(docRef);
+        final snapshot = await transaction.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw const FirestoreException('Ride not found.', code: 'not-found');
@@ -265,7 +268,7 @@ class RideService {
 
       await _firestore.runTransaction((transaction) async {
         // Read new user document for cross-document validation
-        final userSnap = await transaction.get(newUserRef);
+        final userSnap = await transaction.get(newUserRef).withNetworkTimeout();
         if (!userSnap.exists) {
           throw const FirestoreException('New driver profile not found.', code: 'not-found');
         }
@@ -275,7 +278,7 @@ class RideService {
            throw const FirestoreException('New driver is no longer online.', code: 'unavailable');
         }
 
-        final snapshot = await transaction.get(docRef);
+        final snapshot = await transaction.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw const FirestoreException('Ride not found.', code: 'not-found');
@@ -330,7 +333,7 @@ class RideService {
       final docRef = _rides.doc(rideId.trim());
 
       await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
+        final snapshot = await transaction.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw const FirestoreException('Ride not found.', code: 'not-found');
@@ -379,7 +382,7 @@ class RideService {
       final docRef = _rides.doc(rideId.trim());
 
       await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
+        final snapshot = await transaction.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw const FirestoreException('Ride not found.', code: 'not-found');
@@ -609,7 +612,7 @@ class RideService {
       final docRef = _rides.doc(rideId.trim());
 
       await _firestore.runTransaction((tx) async {
-        final snapshot = await tx.get(docRef);
+        final snapshot = await tx.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw const FirestoreException('Ride not found.', code: 'not-found');
@@ -671,7 +674,7 @@ class RideService {
       final docRef = _rides.doc(rideId);
       
       await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
+        final snapshot = await transaction.get(docRef).withNetworkTimeout();
 
         if (!snapshot.exists) {
           throw FirestoreException('Ride not found.', code: 'not-found');
@@ -697,7 +700,7 @@ class RideService {
         transaction.update(docRef, {
           'feedback': {
             'rating': rating,
-            if (comment != null) 'comment': comment,
+            'comment': ?comment,
             'createdAt': FieldValue.serverTimestamp(),
           },
           'updatedAt': FieldValue.serverTimestamp(),
@@ -748,7 +751,7 @@ extension RideServiceHistory on RideService {
         query = query.startAfterDocument(startAfter);
       }
 
-      final querySnapshot = await query.get();
+      final querySnapshot = await query.get().withNetworkTimeout();
       final List<RideModel> history = [];
       DocumentSnapshot? lastDoc;
 
@@ -794,7 +797,7 @@ extension RideServiceHistory on RideService {
         query = query.startAfterDocument(startAfter);
       }
 
-      final querySnapshot = await query.get();
+      final querySnapshot = await query.get().withNetworkTimeout();
       final List<RideModel> history = [];
       DocumentSnapshot? lastDoc;
 
@@ -854,7 +857,7 @@ extension RideServiceHistory on RideService {
         query = query.startAfterDocument(startAfter);
       }
 
-      final querySnapshot = await query.get();
+      final querySnapshot = await query.get().withNetworkTimeout();
       final List<RideModel> history = [];
       DocumentSnapshot? lastDoc;
 

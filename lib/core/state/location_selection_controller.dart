@@ -23,6 +23,20 @@ class LocationSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the calculated route info.
+  void setRouteInfo({
+    required double fare,
+    required double distanceMeters,
+    required double durationSeconds,
+  }) {
+    _draft = _draft.copyWith(
+      estimatedFare: fare,
+      routeDistanceMeters: distanceMeters,
+      routeDurationSeconds: durationSeconds,
+    );
+    notifyListeners();
+  }
+
   /// Clears the pickup location.
   void clearPickup() {
     _draft = _draft.copyWith(clearPickup: true);

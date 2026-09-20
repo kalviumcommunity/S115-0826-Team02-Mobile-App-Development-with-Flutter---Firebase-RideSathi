@@ -1,11 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:ridesathi/services/ride_service.dart';
+import 'package:ridesathi/services/driver_availability_service.dart';
+import 'package:ridesathi/services/driver_data_service.dart';
+import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/ride_feedback_controller.dart';
 import 'package:ridesathi/core/state/view_state.dart';
 
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 class MockRideService extends Fake implements RideService {
   Exception? feedbackError;
@@ -43,6 +47,11 @@ void main() {
     );
 
     setUp(() {
+    final globalFakeFirestore = FakeFirebaseFirestore();
+    RideService.firestoreOverride = globalFakeFirestore;
+    DriverAvailabilityService.firestoreOverride = globalFakeFirestore;
+    DriverDataService.firestoreOverride = globalFakeFirestore;
+    UserProfileService.firestoreOverride = globalFakeFirestore;
       mockService = MockRideService();
       mockAuthController = MockAuthController()..mockUser = mockUser;
       controller = RideFeedbackController(

@@ -10,10 +10,16 @@ import 'location_model.dart';
 class RideRequestDraft {
   final LocationModel? pickup;
   final LocationModel? destination;
+  final double? estimatedFare;
+  final double? routeDistanceMeters;
+  final double? routeDurationSeconds;
 
   const RideRequestDraft({
     this.pickup,
     this.destination,
+    this.estimatedFare,
+    this.routeDistanceMeters,
+    this.routeDurationSeconds,
   });
 
   /// True if both pickup and destination are selected.
@@ -29,12 +35,18 @@ class RideRequestDraft {
   RideRequestDraft copyWith({
     LocationModel? pickup,
     LocationModel? destination,
+    double? estimatedFare,
+    double? routeDistanceMeters,
+    double? routeDurationSeconds,
     bool clearPickup = false,
     bool clearDestination = false,
   }) {
     return RideRequestDraft(
       pickup: clearPickup ? null : (pickup ?? this.pickup),
       destination: clearDestination ? null : (destination ?? this.destination),
+      estimatedFare: estimatedFare ?? this.estimatedFare,
+      routeDistanceMeters: routeDistanceMeters ?? this.routeDistanceMeters,
+      routeDurationSeconds: routeDurationSeconds ?? this.routeDurationSeconds,
     );
   }
 
@@ -43,9 +55,12 @@ class RideRequestDraft {
     if (identical(this, other)) return true;
     return other is RideRequestDraft &&
         other.pickup == pickup &&
-        other.destination == destination;
+        other.destination == destination &&
+        other.estimatedFare == estimatedFare &&
+        other.routeDistanceMeters == routeDistanceMeters &&
+        other.routeDurationSeconds == routeDurationSeconds;
   }
 
   @override
-  int get hashCode => Object.hash(pickup, destination);
+  int get hashCode => Object.hash(pickup, destination, estimatedFare, routeDistanceMeters, routeDurationSeconds);
 }

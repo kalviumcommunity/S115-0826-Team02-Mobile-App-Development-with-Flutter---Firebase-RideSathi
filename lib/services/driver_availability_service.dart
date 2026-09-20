@@ -13,7 +13,8 @@ class DriverAvailabilityService {
   const DriverAvailabilityService([FirebaseFirestore? firestore])
       : _firestore = firestore;
 
-  FirebaseFirestore get _instance => _firestore ?? FirebaseFirestore.instance;
+  static FirebaseFirestore? firestoreOverride;
+  FirebaseFirestore get _instance => _firestore ?? firestoreOverride ?? FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _instance.collection('users');
@@ -60,6 +61,7 @@ class DriverAvailabilityService {
       await _usersCollection.doc(trimmedId).update({
         'isOnline': isOnline,
         'availabilityUpdatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       return isOnline;
     } catch (e) {

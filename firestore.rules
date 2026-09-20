@@ -31,6 +31,16 @@ service cloud.firestore {
       return isAuthenticated() && getUserData().role == 'dispatcher';
     }
 
+    // Admin role — the ONLY authoritative check for admin privileges.
+    // Admin role is NEVER writable by the client.
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    function isAdminOrDispatcher() {
+      return isAdmin() || isDispatcher();
+    }
+
     // Ensures the client uses serverTimestamp for the given field
     function isServerTimestamp(field) {
       return request.resource.data[field] == request.time;
@@ -41,21 +51,18 @@ service cloud.firestore {
     }
 
     function isModifyingProtectedFields() {
-      return affectedKeys().hasAny(['id', 'email', 'role', 'isUnionVerified', 'createdAt']);
+      return affectedKeys().hasAny(['id', 'email', 'role', 'createdAt']);
     }
 
     // -------------------------------------------------------------------------
-    // Rules
+    // Users Collection
     // -------------------------------------------------------------------------
 
     match /users/{userId} {
-      // Any authenticated user can read profiles for nearest matching or dispatch, 
-      // but only dispatchers can view all details. For nearest matching, riders need driver locations, 
-      // but currently the architecture doesn't use a separate location collection.
-      // We will allow authenticated read.
+      // Authenticated users can read profiles (for matching, dispatch, admin)
       allow read: if isAuthenticated();
 
-      // Creation requires the uid to match the document id and no escalation
+      // Creation: uid must match docId, role must be rider or driver, no escalation
       allow create: if isOwner(userId)
                     && request.resource.data.id == userId
                     && request.resource.data.role in ['rider', 'driver']
@@ -63,51 +70,91 @@ service cloud.firestore {
                     && isServerTimestamp('createdAt')
                     && isServerTimestamp('updatedAt');
 
-      // Update requires ownership, prevents role/verification escalation and protected field modification.
-      // Except availability updating by driver which is allowed but limited.
-      allow update: if isOwner(userId)
-                    && !isModifyingProtectedFields()
-                    && isServerTimestamp('updatedAt');
+      // Update: owner can change their own non-protected fields.
+      // Admin can additionally update: isSuspended, suspendedReason, isUnionVerified, verificationStatus.
+      // Neither owner nor admin can change: id, email, role, createdAt.
+      allow update: if !isModifyingProtectedFields()
+                    && isServerTimestamp('updatedAt')
+                    && (
+                      // Owner updates their own profile (cannot touch admin fields)
+                      (isOwner(userId) && !affectedKeys().hasAny(['isSuspended', 'suspendedReason', 'isUnionVerified', 'verificationStatus'])) ||
+                      // Admin can update suspension and verification state
+                      isAdmin()
+                    );
     }
 
+    // -------------------------------------------------------------------------
+    // Rides Collection
+    // -------------------------------------------------------------------------
+
     match /rides/{rideId} {
-      // Read access: Rider who created it, Driver assigned to it, or Dispatcher
+      // Read: rider who created, assigned driver, dispatchers, admins
+      // Any driver can read requested rides (for offer matching)
       allow read: if isAuthenticated() && (
         resource.data.riderId == request.auth.uid ||
         resource.data.driverId == request.auth.uid ||
-        isDispatcher()
+        (isDriver() && resource.data.status == 'requested') ||
+        isAdminOrDispatcher()
       );
 
-      // Create: Only riders can create rides for themselves
+      // Create: only riders, for themselves
       allow create: if isRider()
                     && request.resource.data.riderId == request.auth.uid
                     && request.resource.data.status == 'requested'
                     && isServerTimestamp('createdAt')
                     && isServerTimestamp('updatedAt');
 
-      // Update: 
-      // Rider can cancel if requested or accepted.
-      // Driver can accept, arrive, start, complete, or update driverLocation.
-      // Dispatcher can assign, reassign, etc.
-      // To strictly validate this without complex business logic duplicating in rules, 
-      // we check ownership and prevent arbitrary protected fields modification.
-      allow update: if isAuthenticated() && (
-        // Dispatcher can modify arbitrarily for assignment
+      // Update: role-based permission matrix
+      allow update: if isAuthenticated() && isServerTimestamp('updatedAt') && (
+        // Admin can update anything on a ride (cancel, assign, reassign)
+        isAdmin() ||
+
+        // Dispatcher can assign/reassign
         isDispatcher() ||
-        
-        // Rider can update (cancel or provide feedback)
+
+        // Rider can cancel or provide feedback
         (resource.data.riderId == request.auth.uid && (
           (affectedKeys().hasOnly(['status', 'updatedAt']) && request.resource.data.status == 'cancelled') ||
           (affectedKeys().hasOnly(['feedback', 'updatedAt']) && request.resource.data.status == 'completed' && resource.data.status == 'completed')
         )) ||
-        
-        // Driver can update (accept, arrive, location, etc.)
+
+        // Driver can accept, arrive, update location, start, complete
         (
           isDriver() &&
-          (resource.data.driverId == null || resource.data.driverId == request.auth.uid) // allow assignment acceptance or assigned updates
-          && !affectedKeys().hasAny(['riderId', 'createdAt', 'estimatedFare', 'feedback'])
+          (resource.data.driverId == null || resource.data.driverId == request.auth.uid) &&
+          !affectedKeys().hasAny(['riderId', 'createdAt', 'estimatedFare', 'feedback'])
         )
-      ) && isServerTimestamp('updatedAt');
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Admin Audit Logs — immutable once written
+    // -------------------------------------------------------------------------
+
+    match /adminAuditLogs/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+      // Only admins can create audit entries
+      allow create: if isAdmin() && isServerTimestamp('timestamp');
+      // Nobody can update or delete audit logs (immutable)
+      allow update, delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // System Settings — admin-only read/write
+    // -------------------------------------------------------------------------
+
+    match /systemSettings/{docId} {
+      allow read: if isAdminOrDispatcher();
+      allow write: if isAdmin();
+    }
+
+    // -------------------------------------------------------------------------
+    // Deny all other collections by default
+    // -------------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
