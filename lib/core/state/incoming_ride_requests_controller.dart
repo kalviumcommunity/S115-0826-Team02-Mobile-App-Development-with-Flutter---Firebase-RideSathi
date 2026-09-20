@@ -57,7 +57,7 @@ class IncomingRideRequestsController extends ChangeNotifier {
 
     if (user == null || user.role != UserRole.driver || _activeSessionGeneration != currentGen) {
       stopListening();
-      if (user == null) {
+      if (user == null || user.role != UserRole.driver) {
         _isOnline = false;
       }
     }

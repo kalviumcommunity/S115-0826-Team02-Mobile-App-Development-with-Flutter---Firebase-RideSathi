@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ridesathi/core/state/view_state.dart';
-import 'package:ridesathi/widgets/empty_state_view.dart';
-import 'package:ridesathi/widgets/error_view.dart';
-import 'package:ridesathi/widgets/loading_view.dart';
-import 'package:ridesathi/widgets/view_state_builder.dart';
 
 void main() {
   Widget wrap(Widget child) {

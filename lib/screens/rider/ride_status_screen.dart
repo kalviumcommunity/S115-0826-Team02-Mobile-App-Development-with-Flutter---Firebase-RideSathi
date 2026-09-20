@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/routes/app_routes.dart';
@@ -7,6 +7,7 @@ import '../../core/state/ride_cancellation_controller.dart';
 import '../../models/ride_model.dart';
 import '../../widgets/driver_information_view.dart';
 import '../../widgets/confirmation_dialog.dart';
+import '../../services/route_service.dart';
 
 class RideStatusScreen extends StatefulWidget {
   final String rideId;
@@ -18,16 +19,72 @@ class RideStatusScreen extends StatefulWidget {
 class _RideStatusScreenState extends State<RideStatusScreen> {
   late final RideStatusController _statusController;
   late final RideCancellationController _cancellationController;
+  
+  final MapController _mapController = MapController();
+  final RouteService _routeService = RouteService();
+  RouteResult? _routeResult;
+  bool _isRouting = false;
+  String? _lastLoadedRideId;
 
   @override
   void initState() {
     super.initState();
     _statusController = RideStatusController(rideId: widget.rideId);
+    _statusController.addListener(_onStatusChange);
     _cancellationController = RideCancellationController();
+  }
+
+  void _onStatusChange() {
+    final state = _statusController.state;
+    if (state.isSuccess && state.data != null) {
+      final ride = state.data!;
+      if (_lastLoadedRideId != ride.id) {
+        _lastLoadedRideId = ride.id;
+        _calculateRouteAndFit(ride);
+      }
+    }
+  }
+
+  Future<void> _calculateRouteAndFit(RideModel ride) async {
+    if (ride.pickup.latitude == null || ride.destination.latitude == null) return;
+    
+    setState(() => _isRouting = true);
+    
+    try {
+      final origin = LatLng(ride.pickup.latitude!, ride.pickup.longitude!);
+      final dest = LatLng(ride.destination.latitude!, ride.destination.longitude!);
+      
+      final result = await _routeService.getRoute(origin: origin, destination: dest);
+      
+      if (!mounted) return;
+      setState(() {
+        _routeResult = result;
+        _isRouting = false;
+      });
+      _fitBounds(origin, dest);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isRouting = false);
+      _fitBounds(LatLng(ride.pickup.latitude!, ride.pickup.longitude!), LatLng(ride.destination.latitude!, ride.destination.longitude!));
+    }
+  }
+
+  void _fitBounds(LatLng p1, LatLng p2) {
+    List<LatLng> boundsPoints = [p1, p2];
+    if (_routeResult != null && _routeResult!.points.isNotEmpty) {
+      boundsPoints = _routeResult!.points;
+    }
+    
+    final bounds = LatLngBounds.fromPoints(boundsPoints);
+    _mapController.fitCamera(CameraFit.bounds(
+      bounds: bounds,
+      padding: const EdgeInsets.only(top: 80.0, left: 60.0, right: 60.0, bottom: 420.0),
+    ));
   }
 
   @override
   void dispose() {
+    _statusController.removeListener(_onStatusChange);
     _statusController.dispose();
     _cancellationController.dispose();
     super.dispose();
@@ -87,9 +144,22 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
 
     return Positioned.fill(
       child: FlutterMap(
+        mapController: _mapController,
         options: MapOptions(initialCenter: center, initialZoom: 14.0, interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag)),
         children: [
           TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.ridesathi.ridesathi'),
+          if (_routeResult != null && _routeResult!.points.isNotEmpty)
+            PolylineLayer(
+              polylines: [
+                Polyline<Object>(
+                  points: _routeResult!.points,
+                  color: Colors.black,
+                  strokeWidth: 5.0,
+                  strokeJoin: StrokeJoin.round,
+                  strokeCap: StrokeCap.round,
+                ),
+              ],
+            ),
           if (ride != null) MarkerLayer(markers: [
             if (ride.pickup.latitude != null)
               Marker(point: LatLng(ride.pickup.latitude!, ride.pickup.longitude!), width: 36, height: 36,
@@ -175,12 +245,12 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
                   const SizedBox(height: 16),
 
                   // Route display
-                  _routeRow(Icons.my_location_rounded, Colors.blue, ride.pickup.displayName, isDark),
+                  _routeRow(Icons.my_location_rounded, Colors.blue, ride.pickup.displayName, ride.pickup.address, isDark),
                   Padding(
                     padding: const EdgeInsets.only(left: 10),
                     child: Container(width: 2, height: 20, color: isDark ? Colors.white24 : Colors.black12),
                   ),
-                  _routeRow(Icons.location_on_rounded, Colors.red, ride.destination.displayName, isDark),
+                  _routeRow(Icons.location_on_rounded, Colors.red, ride.destination.displayName, ride.destination.address, isDark),
 
                   const SizedBox(height: 16),
                   const Divider(height: 1),
@@ -257,11 +327,24 @@ class _RideStatusScreenState extends State<RideStatusScreen> {
     );
   }
 
-  Widget _routeRow(IconData icon, Color color, String text, bool isDark) {
-    return Row(children: [
+  Widget _routeRow(IconData icon, Color color, String title, String? subtitle, bool isDark) {
+    return Row(crossAxisAlignment: subtitle != null && subtitle.isNotEmpty && subtitle != title ? CrossAxisAlignment.start : CrossAxisAlignment.center, children: [
       Icon(icon, color: color, size: 18),
       const SizedBox(width: 12),
-      Expanded(child: Text(text, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis)),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (subtitle != null && subtitle.isNotEmpty && subtitle != title)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+        ),
+      ),
     ]);
   }
 

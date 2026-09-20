@@ -4,10 +4,14 @@ import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'services/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FirebaseService.initialize();
+  try {
+    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
+  } catch (_) {}
   runApp(const RideSathiApp());
 }
 

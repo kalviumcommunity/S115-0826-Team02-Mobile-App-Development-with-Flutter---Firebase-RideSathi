@@ -10,7 +10,6 @@ import 'package:ridesathi/core/state/view_state.dart';
 
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 class MockRideService extends Fake implements RideService {
   Exception? feedbackError;

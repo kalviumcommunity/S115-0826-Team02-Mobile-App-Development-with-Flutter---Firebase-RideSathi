@@ -53,14 +53,18 @@ class AdminService {
 
   /// Stream of all rides (real-time), optionally filtered by status.
   Stream<List<RideModel>> watchAllRides({RideStatus? filterStatus}) {
-    Query<Map<String, dynamic>> q = _rides.orderBy('createdAt', descending: true);
+    Query<Map<String, dynamic>> q = _rides;
     if (filterStatus != null) {
       q = q.where('status', isEqualTo: filterStatus.name);
     }
-    return q.snapshots().map((snap) => snap.docs
-        .map((d) => _parseRide(d.data(), d.id))
-        .whereType<RideModel>()
-        .toList());
+    return q.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => _parseRide(d.data(), d.id))
+          .whereType<RideModel>()
+          .toList();
+      list.sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
+      return list;
+    });
   }
 
   /// Stream of actively running rides (accepted, arrived, inProgress).
@@ -71,24 +75,30 @@ class AdminService {
           RideStatus.arrived.name,
           RideStatus.inProgress.name,
         ])
-        .orderBy('updatedAt', descending: false)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => _parseRide(d.data(), d.id))
-            .whereType<RideModel>()
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => _parseRide(d.data(), d.id))
+              .whereType<RideModel>()
+              .toList();
+          list.sort((a, b) => (a.updatedAt ?? DateTime.now()).compareTo(b.updatedAt ?? DateTime.now()));
+          return list;
+        });
   }
 
   /// Stream of pending (requested) rides.
   Stream<List<RideModel>> watchPendingRides() {
     return _rides
         .where('status', isEqualTo: RideStatus.requested.name)
-        .orderBy('createdAt', descending: false)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => _parseRide(d.data(), d.id))
-            .whereType<RideModel>()
-            .toList());
+        .map((snap) {
+          final list = snap.docs
+              .map((d) => _parseRide(d.data(), d.id))
+              .whereType<RideModel>()
+              .toList();
+          list.sort((a, b) => (a.createdAt ?? DateTime.now()).compareTo(b.createdAt ?? DateTime.now()));
+          return list;
+        });
   }
 
   // ─── Dashboard Metrics ─────────────────────────────────────────────────────

@@ -3,7 +3,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/auth_controller.dart';
 import '../../core/utils/validators.dart';
-import '../../models/user_model.dart';
 import '../../widgets/auth_text_field.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/info_banner.dart';

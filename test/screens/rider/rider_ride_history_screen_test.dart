@@ -7,12 +7,8 @@ import 'package:ridesathi/services/driver_data_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/rider_ride_history_controller.dart';
 import 'package:ridesathi/core/state/view_state.dart';
-import 'package:ridesathi/models/location_model.dart';
 import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/screens/rider/rider_ride_history_screen.dart';
-import 'package:ridesathi/widgets/empty_state_view.dart';
-import 'package:ridesathi/widgets/error_view.dart';
-import 'package:ridesathi/widgets/ride_history_card.dart';
 
 class MockRiderRideHistoryController extends RiderRideHistoryController {
   ViewState<List<RideModel>> mockState = const ViewState.initial();

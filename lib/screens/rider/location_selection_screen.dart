@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../core/routes/app_routes.dart';
@@ -54,22 +54,26 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   }
 
   Future<void> _openSearch(bool isPickup) async {
-    final result = await AppNavigator.pushNamed<LocationModel>(
-      context,
-      AppRoutes.riderLocationSearch,
-      arguments: isPickup ? 'pickup' : 'destination',
-    );
-    if (result != null) {
-      if (isPickup) {
-        _controller.setPickup(result);
-      } else {
-        _controller.setDestination(result);
+    try {
+      final result = await AppNavigator.pushNamed<LocationModel>(
+        context,
+        AppRoutes.riderLocationSearch,
+        arguments: isPickup ? 'pickup' : 'destination',
+      );
+      if (result != null) {
+        if (isPickup) {
+          _controller.setPickup(result);
+        } else {
+          _controller.setDestination(result);
+        }
+        if (result.latitude != null && result.longitude != null) {
+          final ll = LatLng(result.latitude!, result.longitude!);
+          setState(() => _mapCenter = ll);
+          _mapController.move(ll, 15.0);
+        }
       }
-      if (result.latitude != null && result.longitude != null) {
-        final ll = LatLng(result.latitude!, result.longitude!);
-        setState(() => _mapCenter = ll);
-        _mapController.move(ll, 15.0);
-      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening search: $e')));
     }
   }
 
@@ -104,11 +108,12 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          // Full-screen map
-          Positioned.fill(
-            child: !_isInitialized
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            // Full-screen map
+            Positioned.fill(
+              child: !_isInitialized
                 ? Container(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EAF0), child: const Center(child: CircularProgressIndicator()))
                 : FlutterMap(
                     mapController: _mapController,
@@ -180,49 +185,57 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                           child: Column(
                             children: [
                               // Pickup field
-                              GestureDetector(
-                                onTap: () => _openSearch(true),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: hasPickup ? Border.all(color: Colors.blue.withValues(alpha: 0.5), width: 1.5) : null,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: hasPickup
-                                            ? Text(draft.pickup!.displayName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)
-                                            : Text('Pickup location', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                                      ),
-                                      if (hasPickup)
-                                        Icon(Icons.edit_location_alt_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                                    ],
+                              Material(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  onTap: () => _openSearch(true),
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: hasPickup ? Border.all(color: Colors.blue.withValues(alpha: 0.5), width: 1.5) : null,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: hasPickup
+                                              ? Text(draft.pickup!.displayName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)
+                                              : Text('Pickup location', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                        ),
+                                        if (hasPickup)
+                                          Icon(Icons.edit_location_alt_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               // Destination field
-                              GestureDetector(
-                                onTap: () => _openSearch(false),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: hasDest ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 1.5) : null,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: hasDest
-                                            ? Text(draft.destination!.displayName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)
-                                            : Text('Where to?', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                                      ),
-                                      if (hasDest)
-                                        Icon(Icons.edit_location_alt_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                                    ],
+                              Material(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(14),
+                                child: InkWell(
+                                  onTap: () => _openSearch(false),
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: hasDest ? Border.all(color: Colors.red.withValues(alpha: 0.5), width: 1.5) : null,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: hasDest
+                                              ? Text(draft.destination!.displayName, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)
+                                              : Text('Where to?', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                        ),
+                                        if (hasDest)
+                                          Icon(Icons.edit_location_alt_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -270,6 +283,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

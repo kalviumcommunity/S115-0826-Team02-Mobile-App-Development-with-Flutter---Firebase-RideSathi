@@ -36,8 +36,8 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
             decoration: InputDecoration(
               hintText: 'Search riders...',
               prefixIcon: const Icon(Icons.search),
-              filled: true, fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              filled: true, fillColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
             ),
           ),
@@ -53,7 +53,7 @@ class _AdminRidersScreenState extends State<AdminRidersScreen> {
               return ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: riders.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (ctx, i) => _RiderTile(
                   rider: riders[i],
                   onSuspend: () => _suspendDialog(ctx, riders[i]),
@@ -103,12 +103,12 @@ class _RiderTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: rider.isSuspended ? Border.all(color: Colors.red.withValues(alpha: 0.4)) : null,
       ),
       child: Row(children: [
-        CircleAvatar(radius: 22, backgroundColor: Colors.blue.shade50, child: const Icon(Icons.person_rounded, color: Colors.blue, size: 22)),
+        CircleAvatar(radius: 22, backgroundColor: Colors.blue.shade50, child: Icon(Icons.person_rounded, color: isDark ? Colors.white : Colors.black, size: 22)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(rider.name, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -118,7 +118,9 @@ class _RiderTile extends StatelessWidget {
           if (rider.createdAt != null) Text('Joined: ${rider.createdAt!.day}/${rider.createdAt!.month}/${rider.createdAt!.year}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
         ])),
         PopupMenuButton<String>(
-          onSelected: (v) { if (v == 'suspend') onSuspend(); else if (v == 'reactivate') onReactivate(); },
+          onSelected: (v) { if (v == 'suspend') {
+            onSuspend();
+          } else if (v == 'reactivate') onReactivate(); },
           itemBuilder: (_) => [
             if (!rider.isSuspended) const PopupMenuItem(value: 'suspend', child: Text('Suspend', style: TextStyle(color: Colors.red))),
             if (rider.isSuspended) const PopupMenuItem(value: 'reactivate', child: Text('Reactivate', style: TextStyle(color: Colors.green))),

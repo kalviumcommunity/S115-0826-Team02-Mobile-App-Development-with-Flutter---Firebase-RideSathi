@@ -11,7 +11,6 @@ import 'package:ridesathi/core/state/profile_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
 
 class _FakeAuthService extends AuthService {
   UserModel? _currentAuthUser;

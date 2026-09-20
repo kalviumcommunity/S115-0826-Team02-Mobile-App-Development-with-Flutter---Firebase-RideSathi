@@ -6,19 +6,14 @@ import 'package:ridesathi/services/driver_availability_service.dart';
 import 'package:ridesathi/services/driver_data_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
-import 'package:ridesathi/core/state/auth_state.dart';
 import 'package:ridesathi/core/theme/app_theme.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/splash_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
-import 'package:ridesathi/widgets/error_view.dart';
-import 'package:ridesathi/widgets/union_badge.dart';
 
 class FakeSplashAuthService extends AuthService {
   final UserModel? mockUser;

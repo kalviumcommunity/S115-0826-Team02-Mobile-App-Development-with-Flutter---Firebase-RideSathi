@@ -12,7 +12,6 @@ import 'package:ridesathi/models/location_model.dart';
 import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/location_provider.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 class MockLocationProvider implements LocationProvider {
   LocationPermissionState permissionResult = LocationPermissionState.granted;

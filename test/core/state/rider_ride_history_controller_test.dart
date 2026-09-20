@@ -11,7 +11,6 @@ import 'package:ridesathi/core/state/view_state.dart';
 import 'package:ridesathi/models/location_model.dart';
 import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 

@@ -7,7 +7,7 @@ import '../../../services/admin_service.dart';
 class AdminAuditController extends ChangeNotifier {
   final AdminService _service;
   ViewState<List<AdminAuditLog>> _logs = const ViewState.initial();
-  bool _isLoadingMore = false;
+  final bool _isLoadingMore = false;
   bool _hasMore = true;
 
   ViewState<List<AdminAuditLog>> get logs => _logs;

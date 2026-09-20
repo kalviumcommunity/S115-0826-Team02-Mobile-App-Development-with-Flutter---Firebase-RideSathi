@@ -15,11 +15,6 @@ import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/screens/profile/profile_screen.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
-import 'package:ridesathi/widgets/auth_text_field.dart';
-import 'package:ridesathi/widgets/confirmation_dialog.dart';
-import 'package:ridesathi/widgets/custom_button.dart';
-import 'package:ridesathi/widgets/info_banner.dart';
 
 class _FakeAuthService extends AuthService {
   UserModel? user;

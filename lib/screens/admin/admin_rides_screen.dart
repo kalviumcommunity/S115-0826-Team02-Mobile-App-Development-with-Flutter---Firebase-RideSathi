@@ -76,7 +76,7 @@ class _AdminRidesScreenState extends State<AdminRidesScreen> {
                 controller: _scroll,
                 itemCount: rides.length + (_ctrl.isLoadingMore ? 1 : 0),
                 padding: const EdgeInsets.all(12),
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (ctx, i) {
                   if (i >= rides.length) return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
                   return _RideTile(ride: rides[i], onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AdminRideDetailScreen(rideId: rides[i].id))));

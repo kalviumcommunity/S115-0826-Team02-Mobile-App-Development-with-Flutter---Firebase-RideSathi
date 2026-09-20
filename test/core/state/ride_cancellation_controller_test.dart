@@ -9,7 +9,6 @@ import 'package:ridesathi/core/state/auth_controller.dart';
 import 'package:ridesathi/core/state/ride_cancellation_controller.dart';
 
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 class MockRideService extends Fake implements RideService {
   int cancelCallCount = 0;

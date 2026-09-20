@@ -61,6 +61,7 @@ class DriverAvailabilityService {
       await _usersCollection.doc(trimmedId).update({
         'isOnline': isOnline,
         'availabilityUpdatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       return isOnline;
     } catch (e) {

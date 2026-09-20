@@ -39,8 +39,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
               decoration: InputDecoration(
                 hintText: 'Search drivers...',
                 prefixIcon: const Icon(Icons.search),
-                filled: true, fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                filled: true, fillColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),
             )),
@@ -67,7 +67,7 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
               return ListView.separated(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: drivers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (ctx, i) => _DriverTile(
                   driver: drivers[i],
                   onVerify: () => _confirm(ctx, 'Verify ${drivers[i].name}?', 'Mark this driver as union-verified?', () => _ctrl.verifyDriver(drivers[i].id, _adminId)),
@@ -126,8 +126,8 @@ class _DriverTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: driver.isSuspended ? Border.all(color: Colors.red.withValues(alpha: 0.4)) : null,
       ),
       child: Row(children: [
@@ -147,8 +147,9 @@ class _DriverTile extends StatelessWidget {
         ])),
         PopupMenuButton<String>(
           onSelected: (v) {
-            if (v == 'verify') onVerify();
-            else if (v == 'suspend') onSuspend();
+            if (v == 'verify') {
+              onVerify();
+            } else if (v == 'suspend') onSuspend();
             else if (v == 'reactivate') onReactivate();
           },
           itemBuilder: (_) => [

@@ -95,11 +95,11 @@ class AuthService {
       final credential = await _instance.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
       return _userFromFirebase(credential.user);
     } catch (e) {
       if (e is TimeoutException || e.toString().contains('TimeoutException')) {
-        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+        throw AuthException('AUTH_TIMEOUT: ' + e.toString(), code: 'deadline-exceeded');
       }
       throw AuthException.from(e);
     }
@@ -118,11 +118,11 @@ class AuthService {
       final credential = await _instance.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
       return _userFromFirebase(credential.user, name: name, phone: phone, role: role, vehicleInfo: vehicleInfo);
     } catch (e) {
       if (e is TimeoutException || e.toString().contains('TimeoutException')) {
-        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+        throw AuthException('AUTH_TIMEOUT: ' + e.toString(), code: 'deadline-exceeded');
       }
       throw AuthException.from(e);
     }
@@ -131,10 +131,10 @@ class AuthService {
   /// Signs out the current user session.
   Future<void> userSignOut() async {
     try {
-      await _instance.signOut().timeout(const Duration(seconds: 15));
+      await _instance.signOut().timeout(const Duration(seconds: 30));
     } catch (e) {
       if (e is TimeoutException || e.toString().contains('TimeoutException')) {
-        throw const AuthException('The operation timed out. Please check your internet connection.', code: 'deadline-exceeded');
+        throw AuthException('AUTH_TIMEOUT: ' + e.toString(), code: 'deadline-exceeded');
       }
       throw AuthException.from(e);
     }

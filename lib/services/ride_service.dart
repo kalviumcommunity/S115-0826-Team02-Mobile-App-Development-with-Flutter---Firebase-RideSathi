@@ -36,7 +36,7 @@ class RideService {
         destination: draft.destination!,
         vehicleType: VehicleType.autoRickshaw, // Default for now
         status: RideStatus.requested,
-        estimatedFare: 150.0, // Default for now
+        estimatedFare: draft.estimatedFare ?? 150.0,
         // Model layer doesn't dictate timestamp anymore
       );
 
@@ -700,7 +700,7 @@ class RideService {
         transaction.update(docRef, {
           'feedback': {
             'rating': rating,
-            if (comment != null) 'comment': comment,
+            'comment': ?comment,
             'createdAt': FieldValue.serverTimestamp(),
           },
           'updatedAt': FieldValue.serverTimestamp(),

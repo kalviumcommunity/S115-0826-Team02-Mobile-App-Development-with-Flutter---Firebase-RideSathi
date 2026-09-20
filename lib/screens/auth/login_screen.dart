@@ -99,112 +99,119 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnim,
-              child: Column(
-                children: [
-                  SizedBox(height: size.height * 0.08),
-                  // Logo
-                  Container(
-                    width: 72, height: 72,
-                    decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle),
-                    child: const Icon(Icons.local_taxi_rounded, size: 40, color: Colors.black),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('RideSathi', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-                  const SizedBox(height: 6),
-                  const Text('Your trusted ride companion', style: TextStyle(color: Colors.white70, fontSize: 15)),
-                  const Spacer(),
-                  // Login card
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 0),
-                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF111827),
-                      borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
-                    ),
-                    child: ListenableBuilder(
-                      listenable: _authController,
-                      builder: (context, _) {
-                        final isLoading = _authController.isAuthenticating;
-                        final errorMessage = _localError ?? _authController.errorMessage;
-                        return Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Welcome back', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              const Text('Sign in to continue', style: TextStyle(color: Colors.white60, fontSize: 14)),
-                              const SizedBox(height: 24),
-                              if (!FirebaseService.isInitialized) ...[
-                                const InfoBanner(icon: Icons.info_outline_rounded, color: Colors.orange, message: "Firebase isn't connected yet. Sign in will work once provisioned."),
-                                const SizedBox(height: 16),
-                              ],
-                              if (errorMessage != null) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.red.withValues(alpha: 0.3))),
-                                  child: Row(children: [
-                                    const Icon(Icons.error_outline, color: Colors.red, size: 18),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text(errorMessage, style: const TextStyle(color: Colors.red, fontSize: 13))),
-                                  ]),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-                              // Email field
-                              Container(
-                                decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(14)),
-                                child: AuthTextField(
-                                  controller: _emailController,
-                                  label: 'Email address',
-                                  icon: Icons.email_outlined,
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: Validators.email,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // Password field
-                              Container(
-                                decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(14)),
-                                child: AuthTextField(
-                                  controller: _passwordController,
-                                  label: 'Password',
-                                  icon: Icons.lock_outline_rounded,
-                                  isPassword: true,
-                                  textInputAction: TextInputAction.done,
-                                  validator: Validators.password,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              SizedBox(
-                                height: 56,
-                                child: ElevatedButton(
-                                  onPressed: isLoading ? null : _handleLogin,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFF59E0B),
-                                    foregroundColor: Colors.black,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    elevation: 0,
-                                  ),
-                                  child: isLoading
-                                      ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black))
-                                      : const Text('Sign In', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                const Text("Don't have an account? ", style: TextStyle(color: Colors.white60)),
-                                GestureDetector(
-                                  onTap: isLoading ? null : () => _showSignupOptions(context),
-                                  child: const Text('Sign Up', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold)),
-                                ),
-                              ]),
-                              SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
-                            ],
+              child: CustomScrollView(
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Column(
+                      children: [
+                        SizedBox(height: size.height * 0.08),
+                        // Logo
+                        Container(
+                          width: 72, height: 72,
+                          decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle),
+                          child: const Icon(Icons.local_taxi_rounded, size: 40, color: Colors.black),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('RideSathi', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                        const SizedBox(height: 6),
+                        const Text('Your trusted ride companion', style: TextStyle(color: Colors.white70, fontSize: 15)),
+                        const Spacer(),
+                        // Login card
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 0),
+                          padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF111827),
+                            borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
                           ),
-                        );
-                      },
+                          child: ListenableBuilder(
+                            listenable: _authController,
+                            builder: (context, _) {
+                              final isLoading = _authController.isAuthenticating;
+                              final errorMessage = _localError ?? _authController.errorMessage;
+                              return Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Welcome back', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    const Text('Sign in to continue', style: TextStyle(color: Colors.white60, fontSize: 14)),
+                                    const SizedBox(height: 24),
+                                    if (!FirebaseService.isInitialized) ...[
+                                      const InfoBanner(icon: Icons.info_outline_rounded, color: Colors.orange, message: "Firebase isn't connected yet. Sign in will work once provisioned."),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    if (errorMessage != null) ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.red.withValues(alpha: 0.3))),
+                                        child: Row(children: [
+                                          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: Text(errorMessage, style: const TextStyle(color: Colors.red, fontSize: 13))),
+                                        ]),
+                                      ),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    // Email field
+                                    Container(
+                                      decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(14)),
+                                      child: AuthTextField(
+                                        controller: _emailController,
+                                        label: 'Email address',
+                                        icon: Icons.email_outlined,
+                                        keyboardType: TextInputType.emailAddress,
+                                        validator: Validators.email,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Password field
+                                    Container(
+                                      decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(14)),
+                                      child: AuthTextField(
+                                        controller: _passwordController,
+                                        label: 'Password',
+                                        icon: Icons.lock_outline_rounded,
+                                        isPassword: true,
+                                        textInputAction: TextInputAction.done,
+                                        validator: Validators.password,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    SizedBox(
+                                      height: 56,
+                                      child: ElevatedButton(
+                                        onPressed: isLoading ? null : _handleLogin,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFF59E0B),
+                                          foregroundColor: Colors.black,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          elevation: 0,
+                                        ),
+                                        child: isLoading
+                                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black))
+                                            : const Text('Sign In', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                      const Text("Don't have an account? ", style: TextStyle(color: Colors.white60)),
+                                      GestureDetector(
+                                        onTap: isLoading ? null : () => _showSignupOptions(context),
+                                        child: const Text('Sign Up', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold)),
+                                      ),
+                                    ]),
+                                    SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

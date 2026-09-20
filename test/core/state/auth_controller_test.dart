@@ -11,7 +11,6 @@ import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/auth_service.dart';
 import 'package:ridesathi/services/firebase_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
 
 /// Fake implementation of [AuthService] for deterministic controller unit tests.
 class FakeAuthService extends AuthService {

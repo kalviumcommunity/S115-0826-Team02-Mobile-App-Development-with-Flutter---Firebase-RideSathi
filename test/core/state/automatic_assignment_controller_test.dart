@@ -10,7 +10,6 @@ import 'package:ridesathi/core/state/fallback_matching_controller.dart';
 import 'package:ridesathi/models/candidate_evaluation.dart';
 import 'package:ridesathi/models/driver_operational_data.dart';
 import 'package:ridesathi/models/matching_attempt_state.dart';
-import 'package:ridesathi/services/ride_service.dart';
 import 'package:ridesathi/core/state/view_state.dart';
 
 import 'package:ridesathi/services/nearest_driver_service.dart';

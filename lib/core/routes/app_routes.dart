@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/state/auth_controller.dart';
 import '../../models/user_model.dart';
 import '../../models/ride_model.dart';
+import '../../models/location_model.dart';
 import '../../screens/admin/admin_home_screen.dart';
 import '../../screens/auth/driver_signup_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -17,6 +18,7 @@ import '../../screens/rider/ride_review_boundary_screen.dart';
 import '../../screens/rider/ride_status_screen.dart';
 import '../../screens/rider/rider_home_screen.dart';
 import '../../screens/rider/rider_ride_history_screen.dart';
+import '../../screens/rider/hot_places_screen.dart';
 import '../../screens/dispatch/driver_data_validation_screen.dart';
 import '../../screens/dispatch/candidate_validation_screen.dart';
 import '../../screens/dispatch/dispatcher_home_screen.dart';
@@ -55,8 +57,9 @@ class AppRoutes {
   static const String riderRequestRide = '/rider/request-ride';
   static const String riderLocationSearch = '/rider/location-search';
   static const String riderReviewRide = '/rider/review-ride';
-  static const String riderStatus = '/rider/ride-status';
+  static const String riderStatus = '/rider/status';
   static const String riderHistory = '/rider/history';
+  static const String riderHotPlaces = '/rider/hot-places';
   static const String riderFeedback = '/rider/feedback';
 
   // Reserved Future Role Route
@@ -307,7 +310,7 @@ class AppRoutes {
           );
         }
         final locationType = settings.arguments as String? ?? 'pickup';
-        return MaterialPageRoute(
+        return MaterialPageRoute<LocationModel>(
           builder: (_) => LocationSearchScreen(locationType: locationType),
           settings: settings,
         );
@@ -363,6 +366,18 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => const RiderRideHistoryScreen(),
+          settings: settings,
+        );
+
+      case riderHotPlaces:
+        if (!isAuthenticated) {
+          return MaterialPageRoute(
+            builder: (_) => LoginScreen(authController: controller),
+            settings: settings,
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => const HotPlacesScreen(),
           settings: settings,
         );
 
@@ -619,6 +634,11 @@ class AppNavigator {
   /// Navigates to the Driver Active Ride screen.
   static Future<void> toDriverActiveRide(BuildContext context) {
     return pushNamed(context, AppRoutes.driverActiveRide);
+  }
+
+  /// Navigates to Rider Hot Places screen
+  static void toRiderHotPlaces(BuildContext context) {
+    Navigator.pushNamed(context, AppRoutes.riderHotPlaces);
   }
 
   /// Navigates to the Driver Home screen, clearing the entire back stack.

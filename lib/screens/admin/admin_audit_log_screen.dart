@@ -29,7 +29,7 @@ class _AdminAuditLogScreenState extends State<AdminAuditLogScreen> {
         return ListView.separated(
           padding: const EdgeInsets.all(12),
           itemCount: logs.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
+          separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (ctx, i) => _AuditTile(log: logs[i], isDark: isDark),
         );
       },
@@ -64,7 +64,7 @@ class _AuditTile extends StatelessWidget {
         child: Icon(Icons.history_rounded, color: color, size: 18)),
       title: Text(log.action.displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Target: ${log.targetId.length > 16 ? log.targetId.substring(0, 16) + '…' : log.targetId}', style: const TextStyle(fontSize: 11)),
+        Text('Target: ${log.targetId.length > 16 ? '${log.targetId.substring(0, 16)}…' : log.targetId}', style: const TextStyle(fontSize: 11)),
         if (log.reason != null) Text('Reason: ${log.reason}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ]),
       trailing: Text(_fmt(log.timestamp), style: const TextStyle(fontSize: 10, color: Colors.grey)),

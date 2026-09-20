@@ -9,7 +9,6 @@ import 'package:ridesathi/core/state/ride_request_controller.dart';
 
 import 'package:ridesathi/models/ride_model.dart';
 import 'package:ridesathi/models/ride_request_draft.dart';
-import 'package:ridesathi/services/ride_service.dart';
 
 // Very basic Mocking since we don't have mockito configured here yet
 class MockRideService extends Fake implements RideService {

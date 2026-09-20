@@ -6,7 +6,6 @@ import 'package:ridesathi/services/driver_availability_service.dart';
 import 'package:ridesathi/services/driver_data_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/models/driver_location.dart';
-import 'package:ridesathi/services/ride_service.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
 
 void main() {

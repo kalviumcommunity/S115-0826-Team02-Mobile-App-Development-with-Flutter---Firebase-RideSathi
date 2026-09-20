@@ -10,12 +10,11 @@ import '../../core/state/driver_availability_controller.dart';
 import '../../core/theme/theme_controller.dart';
 
 import '../../models/user_model.dart';
-import '../../widgets/empty_state_view.dart';
 import '../../widgets/error_view.dart';
 import '../../widgets/loading_view.dart';
-import '../../services/real_location_service.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../services/real_location_service.dart';
 
 /// Landing and dashboard screen for authenticated Drivers in RideSathi.
 ///
@@ -66,9 +65,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _ownsAcceptanceController = false;
   bool _ownsRejectionController = false;
 
-  final RealLocationService _locationService = RealLocationService();
+  
   final MapController _mapController = MapController();
-  LatLng? _currentLocation;
+  final RealLocationService _locationService = RealLocationService();
+  LatLng _mapCenter = const LatLng(28.6139, 77.2090);
+  bool _isMapInitialized = false;
+
 
   @override
   void initState() {
@@ -117,26 +119,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         DriverAvailabilityController(authController: _authController);
 
     _availabilityController.addListener(_onAvailabilityStateChanged);
-    _initializeLocation();
+    _initLocation();
   }
 
-  Future<void> _initializeLocation() async {
+  
+  Future<void> _initLocation() async {
     try {
       final loc = await _locationService.getCurrentLocation();
-      if (mounted) {
-        setState(() {
-          _currentLocation = LatLng(loc.latitude ?? 28.6139, loc.longitude ?? 77.2090);
-        });
-        _mapController.move(_currentLocation!, 15.0);
-      }
+      if (!mounted) return;
+      final ll = LatLng(loc.latitude ?? 28.6139, loc.longitude ?? 77.2090);
+      setState(() { _mapCenter = ll; _isMapInitialized = true; });
+      _mapController.move(ll, 15.0);
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _currentLocation = const LatLng(28.6139, 77.2090);
-        });
-      }
+      if (mounted) setState(() => _isMapInitialized = true);
     }
   }
+
 
   void _onRejectionStateChanged() {
     final state = _rejectionController.state;
@@ -334,53 +332,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
         ],
       ),
-      body: Stack(
+      body: SizedBox.expand(
+        child: Stack(
         children: [
-          // Background Interactive Map
+          
           Positioned.fill(
-            child: _currentLocation == null 
-              ? const Center(child: CircularProgressIndicator())
-              : FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _currentLocation!,
-                    initialZoom: 15.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.ridesathi.driver',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: _currentLocation!,
-                          width: 40,
-                          height: 40,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
-                                ),
-                              ),
+            child: !_isMapInitialized
+                ? Container(color: isDark ? const Color(0xFF0F172A) : const Color(0xFFE8EAF0), child: const Center(child: CircularProgressIndicator()))
+                : FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(initialCenter: _mapCenter, initialZoom: 15.0),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.ridesathi.ridesathi',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _mapCenter,
+                            width: 60, height: 60,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), shape: BoxShape.circle)),
+                                Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.3), shape: BoxShape.circle)),
+                                Container(width: 20, height: 20, decoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)])),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
-          
+
           SafeArea(
             child: Column(
               children: [
@@ -512,6 +498,32 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                                         ],
                                       ),
                                       const Spacer(),
+                                      // Countdown timer bar
+                                      TweenAnimationBuilder<double>(
+                                        tween: Tween(begin: 1.0, end: 0.0),
+                                        duration: const Duration(seconds: 15),
+                                        builder: (context, value, child) {
+                                          return Column(
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text('Accept in s', style: TextStyle(color: value < 0.3 ? Colors.red : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              LinearProgressIndicator(
+                                                value: value,
+                                                backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                                                valueColor: AlwaysStoppedAnimation(value < 0.3 ? Colors.red : const Color(0xFFF59E0B)),
+                                                borderRadius: BorderRadius.circular(4),
+                                                minHeight: 4,
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
                                       AnimatedBuilder(
                                         animation: Listenable.merge([_acceptanceController, _rejectionController]),
                                         builder: (context, _) {
@@ -569,6 +581,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
       },

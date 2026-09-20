@@ -8,7 +8,6 @@ import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/ride_feedback_controller.dart';
 import 'package:ridesathi/core/state/view_state.dart';
 import 'package:ridesathi/screens/rider/ride_feedback_screen.dart';
-import 'package:ridesathi/widgets/star_rating_input.dart';
 
 class MockRideFeedbackController extends RideFeedbackController {
   ViewState<void> _mockState = const ViewState.initial();

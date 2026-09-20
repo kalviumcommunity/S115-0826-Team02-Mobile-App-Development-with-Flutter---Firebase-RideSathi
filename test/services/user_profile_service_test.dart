@@ -6,7 +6,6 @@ import 'package:ridesathi/services/driver_data_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/models/user_model.dart';
 import 'package:ridesathi/services/firestore_exception.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
 
 /// Test double subclassing [UserProfileService] to verify profile persistence
 /// contracts and controller integrations without calling live Firestore network.

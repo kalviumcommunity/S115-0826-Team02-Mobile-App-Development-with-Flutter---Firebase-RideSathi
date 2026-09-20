@@ -66,10 +66,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final isWide = size.width > 720;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final sidebarBg = isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B);
+    final sidebarBg = isDark ? const Color(0xFF111111) : Colors.black;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF3F4F6),
       body: Row(
         children: [
           // ─── Sidebar (wide screens) ─────────────────────────────────────────
@@ -88,7 +88,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         Container(
                           width: 36, height: 36,
                           decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle),
-                          child: const Icon(Icons.local_taxi_rounded, size: 20, color: Colors.black),
+                          child: const Icon(Icons.local_taxi_rounded, size: 20, color: Colors.white),
                         ),
                         const SizedBox(width: 10),
                         const Column(
@@ -129,7 +129,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Container(
                   height: MediaQuery.of(context).padding.top + 56,
                   padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  color: isDark ? const Color(0xFF111111) : Colors.white,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
@@ -186,7 +186,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(children: [
-                  Container(width: 36, height: 36, decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle), child: const Icon(Icons.local_taxi_rounded, size: 20, color: Colors.black)),
+                  Container(width: 36, height: 36, decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle), child: const Icon(Icons.local_taxi_rounded, size: 20, color: Colors.white)),
                   const SizedBox(width: 10),
                   const Text('RideSathi Admin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ]),
@@ -209,8 +209,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         currentIndex: _selectedIndex > 4 ? 4 : _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        selectedItemColor: const Color(0xFFF59E0B),
+        backgroundColor: isDark ? const Color(0xFF111111) : Colors.white,
+        selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         items: _navItems.take(5).map((n) => BottomNavigationBarItem(icon: Icon(n.icon), label: n.label)).toList(),
       ),
@@ -241,14 +241,14 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red.shade400 : selected ? const Color(0xFFF59E0B) : Colors.white60;
+    final color = isDestructive ? Colors.red.shade400 : selected ? Colors.black : Colors.white60;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFF59E0B).withValues(alpha: 0.12) : Colors.transparent,
+          color: selected ? Colors.black.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(children: [

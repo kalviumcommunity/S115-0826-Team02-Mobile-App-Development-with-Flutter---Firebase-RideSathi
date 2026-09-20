@@ -6,7 +6,6 @@ import 'package:ridesathi/services/driver_data_service.dart';
 import 'package:ridesathi/services/user_profile_service.dart';
 import 'package:ridesathi/core/state/driver_information_controller.dart';
 import 'package:ridesathi/models/user_model.dart';
-import 'package:ridesathi/services/user_profile_service.dart';
 
 class MockUserProfileService implements UserProfileService {
   final Map<String, UserModel> mockDatabase = {};
