@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/state/auth_controller.dart';
@@ -141,7 +142,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       label: 'Full Name',
                       icon: Icons.person_outline,
                       validator: Validators.name,
-                      
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
                     ),
                     const SizedBox(height: AppConstants.spaceM),
                     AuthTextField(
@@ -150,7 +151,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: Validators.phone,
-                      
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                     const SizedBox(height: AppConstants.spaceM),
                     AuthTextField(

@@ -2,13 +2,13 @@
 class Validators {
   Validators._();
 
-  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-  static final RegExp _phonePattern = RegExp(r'^\+?\d{7,15}$');
+  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@gmail\.com$');
+  static final RegExp _phonePattern = RegExp(r'^\+?\d{1,10}$');
 
   static String? email(String? value) {
     final trimmed = value?.trim() ?? '';
     if (trimmed.isEmpty) return 'Email is required.';
-    if (!_emailPattern.hasMatch(trimmed)) return 'Enter a valid email address.';
+    if (!_emailPattern.hasMatch(trimmed)) return 'Enter a valid gmail.com address.';
     return null;
   }
 
@@ -34,12 +34,12 @@ class Validators {
     return null;
   }
 
-  /// Validates a phone number: required, optional + prefix, 7–15 digits.
+  /// Validates a phone number: required, optional + prefix, max 10 digits.
   static String? phone(String? value) {
     final trimmed = value?.trim() ?? '';
     if (trimmed.isEmpty) return 'Phone number is required.';
     if (!_phonePattern.hasMatch(trimmed)) {
-      return 'Enter a valid phone number.';
+      return 'Enter a valid phone number (max 10 digits).';
     }
     return null;
   }

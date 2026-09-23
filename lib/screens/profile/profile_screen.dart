@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/state/auth_controller.dart';
@@ -450,6 +451,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.person_outline_rounded,
                   keyboardType: TextInputType.name,
                   validator: Validators.name,
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
                 ),
                 const SizedBox(height: AppConstants.spaceL),
                 AuthTextField(
@@ -458,6 +460,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   validator: Validators.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
                 const SizedBox(height: AppConstants.spaceL),
                 TextFormField(
