@@ -3,7 +3,7 @@ class Validators {
   Validators._();
 
   static final RegExp _emailPattern = RegExp(r'^[^@\s]+@gmail\.com$');
-  static final RegExp _phonePattern = RegExp(r'^\+?\d{1,10}$');
+  static final RegExp _phonePattern = RegExp(r'^\d{10}$');
 
   static String? email(String? value) {
     final trimmed = value?.trim() ?? '';
@@ -16,6 +16,11 @@ class Validators {
     final entered = value ?? '';
     if (entered.isEmpty) return 'Password is required.';
     if (entered.length < 6) return 'Password must be at least 6 characters.';
+    
+    if (!RegExp(r'[a-zA-Z]').hasMatch(entered)) return 'Password must contain at least one letter.';
+    if (!RegExp(r'[0-9]').hasMatch(entered)) return 'Password must contain at least one number.';
+    if (!RegExp(r'[^a-zA-Z0-9]').hasMatch(entered)) return 'Password must contain at least one special character.';
+    
     return null;
   }
 
@@ -34,12 +39,12 @@ class Validators {
     return null;
   }
 
-  /// Validates a phone number: required, optional + prefix, max 10 digits.
+  /// Validates a phone number: required, exactly 10 digits.
   static String? phone(String? value) {
     final trimmed = value?.trim() ?? '';
     if (trimmed.isEmpty) return 'Phone number is required.';
     if (!_phonePattern.hasMatch(trimmed)) {
-      return 'Enter a valid phone number (max 10 digits).';
+      return 'Enter a valid 10-digit phone number.';
     }
     return null;
   }
