@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ridesathi/core/constants/app_constants.dart';
 import 'package:ridesathi/core/routes/app_routes.dart';
 import 'package:ridesathi/core/state/auth_controller.dart';
@@ -120,6 +121,7 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
                       label: 'Full Name',
                       icon: Icons.person_outline,
                       validator: (value) => value == null || value.isEmpty ? 'Please enter your name' : null,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]'))],
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     AuthTextField(
@@ -128,6 +130,7 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: (value) => value == null || value.isEmpty ? 'Please enter your phone number' : null,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                     const SizedBox(height: AppConstants.spaceL),
                     AuthTextField(
